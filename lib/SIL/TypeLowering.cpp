@@ -595,6 +595,13 @@ namespace {
       return B.createLoad(loc, addr, LoadOwnershipQualifier::Unqualified);
     }
 
+    SILValue emitAtomicXchg(SILBuilder &B, SILLocation loc, SILValue value,
+                            SILValue addr, StoreOwnershipQualifier qual) const override {
+      if (B.getFunction().hasQualifiedOwnership())
+        return B.createAtomicXchg(loc, value, addr, StoreOwnershipQualifier::Trivial);
+      return B.createAtomicXchg(loc, value, addr, StoreOwnershipQualifier::Unqualified);
+    }
+
     void emitDestroyAddress(SILBuilder &B, SILLocation loc,
                             SILValue addr) const override {
       // Trivial
@@ -674,10 +681,19 @@ namespace {
       // 1. Load old value.
       // 2. Store new value.
       // 3. Release old value.
+
+      // original impl:
       SILValue old =
-          B.createLoad(loc, addr, LoadOwnershipQualifier::Unqualified);
+              B.createLoad(loc, addr, LoadOwnershipQualifier::Unqualified);
       B.createStore(loc, value, addr, StoreOwnershipQualifier::Unqualified);
       B.emitDestroyValueOperation(loc, old);
+
+      // new impl:
+      /*
+      SILValue old =
+              B.createAtomicXchg(loc, value, addr, StoreOwnershipQualifier::Unqualified);
+      B.emitDestroyValueOperation(loc, old);
+       */
     }
 
     SILValue emitLoad(SILBuilder &B, SILLocation loc, SILValue addr,
@@ -694,6 +710,36 @@ namespace {
 
       // Otherwise, emit the copy value operation.
       return B.emitCopyValueOperation(loc, loadValue);
+    }
+
+    SILValue emitAtomicXchg(SILBuilder &B, SILLocation loc, SILValue value,
+                            SILValue addr, StoreOwnershipQualifier qual) const override {
+      if (B.getFunction().hasQualifiedOwnership())
+        return B.createAtomicXchg(loc, value, addr, qual);
+
+      if (qual != StoreOwnershipQualifier::Assign)
+        return B.createAtomicXchg(loc, value, addr, StoreOwnershipQualifier::Unqualified);
+
+      assert(0 && "AtomicXchg instruction with assign qualifier.");
+
+      // If the ownership qualifier is [assign], then we need to eliminate the
+      // old value.
+      //
+      // 1. Load old value.
+      // 2. Store new value.
+      // 3. Release old value.
+
+      // original impl from store:
+      /*SILValue old =
+              B.createLoad(loc, addr, LoadOwnershipQualifier::Unqualified);
+      B.createStore(loc, value, addr, StoreOwnershipQualifier::Unqualified);
+      B.emitDestroyValueOperation(loc, old);*/
+
+      // new impl:
+      SILValue old =
+              B.createAtomicXchg(loc, value, addr, StoreOwnershipQualifier::Unqualified);
+      B.emitDestroyValueOperation(loc, old);
+      return old;
     }
   };
 
@@ -1055,6 +1101,11 @@ namespace {
     SILValue emitLoad(SILBuilder &B, SILLocation loc, SILValue addr,
                       LoadOwnershipQualifier qual) const override {
       llvm_unreachable("calling emitLoad on non-loadable type");
+    }
+
+    SILValue emitAtomicXchg(SILBuilder &B, SILLocation loc, SILValue value,
+                   SILValue addr, StoreOwnershipQualifier qual) const override {
+      llvm_unreachable("calling emitAtomicXchg on non-loadable type");
     }
 
     void emitDestroyAddress(SILBuilder &B, SILLocation loc,

@@ -3040,6 +3040,35 @@ enum class StoreOwnershipQualifier {
 };
 static_assert(2 == SILNode::NumStoreOwnershipQualifierBits, "Size mismatch");
 
+/*
+/// TODO: doc!
+class StoreInstBase {
+  friend SILBuilder;
+
+protected:
+  FixedOperandList<2> Operands;
+
+  StoreInstBase(SILValue Src, SILValue Dest)
+      : Operands(this, Src, Dest) {}
+
+public:
+  enum {
+    /// the value being stored
+    Src,
+    /// the lvalue being stored to
+    Dest
+  };
+
+  SILValue getSrc() const { return Operands[Src].get(); }
+  SILValue getDest() const { return Operands[Dest].get(); }
+
+  ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
+  MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
+
+  StoreOwnershipQualifier getOwnershipQualifier() const = 0;
+};
+*/
+
 /// StoreInst - Represents a store from a memory location.
 class StoreInst
     : public InstructionBase<SILInstructionKind::StoreInst,
@@ -3071,6 +3100,44 @@ public:
       SILInstruction::Bits.StoreInst.OwnershipQualifier);
   }
 };
+
+
+/// AtomicXchgInst - Represents an atomic exchange of a memory location.
+class AtomicXchgInst
+        : public InstructionBase<SILInstructionKind::AtomicXchgInst,
+                SingleValueInstruction> {
+  friend SILBuilder;
+
+private:
+  FixedOperandList<2> Operands;
+
+  AtomicXchgInst(SILDebugLocation Loc, SILValue Src, SILValue Dest,
+                 StoreOwnershipQualifier Qualifier = StoreOwnershipQualifier::Unqualified)
+          : InstructionBase(Loc, Dest->getType().getObjectType()),
+          Operands(this, Src, Dest) {
+    SILInstruction::Bits.AtomicXchgInst.OwnershipQualifier = unsigned(Qualifier);
+  }
+
+public:
+  enum {
+    /// the value being stored
+    Src,
+    /// the lvalue being stored to
+    Dest
+  };
+
+  SILValue getSrc() const { return Operands[Src].get(); }
+  SILValue getDest() const { return Operands[Dest].get(); }
+
+  ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
+  MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
+
+  StoreOwnershipQualifier getOwnershipQualifier() const {
+    return StoreOwnershipQualifier(
+            SILInstruction::Bits.AtomicXchgInst.OwnershipQualifier);
+  }
+};
+
 
 /// Represents a load of a borrowed value. Must be paired with an end_borrow
 /// instruction in its use-def list.

@@ -332,6 +332,14 @@ public:
   virtual SILValue emitLoad(SILBuilder &B, SILLocation loc, SILValue addr,
                             LoadOwnershipQualifier qual) const = 0;
 
+  /// Emit an atomic exchange of \p value into \p addr given the
+  /// StoreOwnershipQualifier qual.
+  ///
+  /// This abstracts over the differences in between trivial and non-trivial
+  /// types.
+  virtual SILValue emitAtomicXchg(SILBuilder &B, SILLocation loc, SILValue value,
+                                  SILValue addr, StoreOwnershipQualifier qual) const = 0;
+
   /// Put an exact copy of the value in the source address in the
   /// destination address.
   virtual void emitCopyInto(SILBuilder &B,

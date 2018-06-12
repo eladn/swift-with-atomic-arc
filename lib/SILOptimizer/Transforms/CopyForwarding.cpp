@@ -353,6 +353,9 @@ public:
   bool visitStoreInst(StoreInst *Store) {
     llvm_unreachable("illegal reinitialization or store of an address");
   }
+  bool visitAtomicXchgInst(AtomicXchgInst *AtomicXchg) {
+    llvm_unreachable("illegal reinitialization or store of an address");
+  }
   bool visitDestroyAddrInst(DestroyAddrInst *UserInst) {
     Oper = &UserInst->getOperandRef();
     return true;
@@ -449,6 +452,11 @@ public:
   }
   bool visitStoreInst(StoreInst *Store) {
     Oper = &Store->getAllOperands()[StoreInst::Dest];
+    assert(Oper->get() == Address && "illegal store of an address");
+    return true;
+  }
+  bool visitAtomicXchgInst(AtomicXchgInst *AtomicXchg) {
+    Oper = &AtomicXchg->getAllOperands()[AtomicXchgInst::Dest];
     assert(Oper->get() == Address && "illegal store of an address");
     return true;
   }

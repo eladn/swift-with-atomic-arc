@@ -1433,6 +1433,36 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
       }
       return;
     }
+    case SILInstructionKind::AtomicXchgInst: {
+      auto AXI = cast<AtomicXchgInst>(I);
+      if (isPointer(AXI)) {
+        CGNode *AddrNode = ConGraph->getNode(AXI->getDest(), this);
+        if (!AddrNode) {
+          // A load from an address we don't handle -> be conservative.
+          CGNode *ValueNode = ConGraph->getNode(AXI, this);
+          ConGraph->setEscapesGlobal(ValueNode);
+          return;
+        }
+        CGNode *PointsTo = ConGraph->getContentNode(AddrNode);
+        // No need for a separate node for the load instruction:
+        // just reuse the content node.
+        ConGraph->setNode(AXI, PointsTo);
+      }
+      if (CGNode *ValueNode = ConGraph->getNode(I->getOperand(StoreInst::Src),
+                                                this)) {
+        CGNode *AddrNode = ConGraph->getNode(I->getOperand(StoreInst::Dest),
+                                             this);
+        if (AddrNode) {
+          // Create a defer-edge from the content to the stored value.
+          CGNode *PointsTo = ConGraph->getContentNode(AddrNode);
+          ConGraph->defer(PointsTo, ValueNode);
+        } else {
+          // A store to an address we don't handle -> be conservative.
+          ConGraph->setEscapesGlobal(ValueNode);
+        }
+      }
+      return;
+    }
     case SILInstructionKind::CopyAddrInst: {
       // Be conservative if the dest may be the final release.
       if (!cast<CopyAddrInst>(I)->isInitializationOfDest()) {

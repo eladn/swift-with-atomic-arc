@@ -450,6 +450,27 @@ static SILValue scalarizeLoad(LoadInst *LI,
   return B.createStruct(LI->getLoc(), LI->getType(), ElementTmps);
 }
 
+/// Scalarize an atomic-exchange down to its subelements.  If NewLoads is
+/// specified, this can return the newly generated sub-element loads.
+static SILValue scalarizeAtomicXchg(AtomicXchgInst *AXI,
+                                    SmallVectorImpl<SILValue> &ElementAddrs) {
+  SILBuilderWithScope B(AXI);
+  SmallVector<SILValue, 4> OldValues;
+  SmallVector<SILValue, 4> ElementTmps;
+  getScalarizedElements(AXI->getOperand(0), ElementTmps, AXI->getLoc(), B);
+
+  for (unsigned i = 0, e = ElementAddrs.size(); i != e; ++i) {
+    auto *SubAXI = B.createTrivialAtomicXchgOr(AXI->getLoc(), ElementTmps[i],
+                                               ElementAddrs[i],
+                                               AXI->getOwnershipQualifier());
+    OldValues.push_back(SubAXI);
+  }
+
+  if (AXI->getType().is<TupleType>())
+    return B.createTuple(AXI->getLoc(), AXI->getType(), OldValues);
+  return B.createStruct(AXI->getLoc(), AXI->getType(), OldValues);
+}
+
 //===----------------------------------------------------------------------===//
 //                     ElementUseCollector Implementation
 //===----------------------------------------------------------------------===//
@@ -969,6 +990,14 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
           B.createTrivialStoreOr(SI->getLoc(), ElementTmps[i], ElementAddrs[i],
                                  SI->getOwnershipQualifier());
         SI->eraseFromParent();
+        continue;
+      }
+
+      // Scalarize AtomicXchgInst
+      if (auto *AXI = dyn_cast<AtomicXchgInst>(User)) {
+        SILValue Result = scalarizeAtomicXchg(AXI, ElementAddrs);
+        AXI->replaceAllUsesWith(Result);
+        AXI->eraseFromParent();
         continue;
       }
 

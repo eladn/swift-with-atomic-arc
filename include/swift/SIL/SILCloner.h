@@ -762,6 +762,15 @@ void SILCloner<ImplClass>::visitStoreInst(StoreInst *Inst) {
 }
 
 template <typename ImplClass>
+void SILCloner<ImplClass>::visitAtomicXchgInst(AtomicXchgInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  doPostProcess(Inst, getBuilder().createAtomicXchg(getOpLocation(Inst->getLoc()),
+                                                    getOpValue(Inst->getSrc()),
+                                                    getOpValue(Inst->getDest()),
+                                                    Inst->getOwnershipQualifier()));
+}
+
+template <typename ImplClass>
 void SILCloner<ImplClass>::visitStoreBorrowInst(StoreBorrowInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   doPostProcess(Inst,

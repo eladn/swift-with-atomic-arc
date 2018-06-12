@@ -269,6 +269,9 @@ static SILFunction *getCalleeFunction(
     FullArgs.push_back(Arg);
   SILValue CalleeValue = AI.getCallee();
 
+  if (dyn_cast<AtomicXchgInst>(CalleeValue))
+    return nullptr;
+
   if (auto *LI = dyn_cast<LoadInst>(CalleeValue)) {
     // Conservatively only see through alloc_box; we assume this pass is run
     // immediately after SILGen

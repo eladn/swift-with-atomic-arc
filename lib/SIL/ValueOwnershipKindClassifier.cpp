@@ -350,6 +350,10 @@ ValueOwnershipKind ValueOwnershipKindClassifier::visitLoadInst(LoadInst *LI) {
   llvm_unreachable("Unhandled LoadOwnershipQualifier in switch.");
 }
 
+ValueOwnershipKind ValueOwnershipKindClassifier::visitAtomicXchgInst(AtomicXchgInst *LI) {
+  return ValueOwnershipKind::Owned;
+}
+
 //===----------------------------------------------------------------------===//
 //                   Builtin OwnershipValueKind Computation
 //===----------------------------------------------------------------------===//

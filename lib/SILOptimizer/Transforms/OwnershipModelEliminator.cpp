@@ -55,6 +55,7 @@ struct OwnershipModelEliminatorVisitor
   bool visitSILInstruction(SILInstruction *I) { return false; }
   bool visitLoadInst(LoadInst *LI);
   bool visitStoreInst(StoreInst *SI);
+  bool visitAtomicXchgInst(AtomicXchgInst *AXI);
   bool visitStoreBorrowInst(StoreBorrowInst *SI);
   bool visitCopyValueInst(CopyValueInst *CVI);
   bool visitCopyUnownedValueInst(CopyUnownedValueInst *CVI);
@@ -121,6 +122,25 @@ bool OwnershipModelEliminatorVisitor::visitStoreInst(StoreInst *SI) {
 
   // Then remove the qualified store.
   SI->eraseFromParent();
+  return true;
+}
+
+bool OwnershipModelEliminatorVisitor::visitAtomicXchgInst(AtomicXchgInst *AXI) {
+  auto Qualifier = AXI->getOwnershipQualifier();
+
+  // If the qualifier is unqualified, there is nothing further to do
+  // here. Just return.
+  if (Qualifier == StoreOwnershipQualifier::Unqualified)
+    return false;
+
+  SILValue Result = B.emitAtomicXchgValueOperation(AXI->getLoc(), AXI->getSrc(),
+                                                   AXI->getDest(),
+                                                   AXI->getOwnershipQualifier());
+
+  // Then remove the qualified atomic_exchange and use the unqualified
+  // atomic_exchange as the def of all of AXI's uses.
+  AXI->replaceAllUsesWith(Result);
+  AXI->eraseFromParent();
   return true;
 }
 

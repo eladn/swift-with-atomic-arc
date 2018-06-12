@@ -1668,6 +1668,15 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
                                     getLocalValue(ValID2, addrType), Qualifier);
     break;
   }
+  case SILInstructionKind::AtomicXchgInst: {
+    auto Ty = MF->getType(TyID);
+    SILType addrType = getSILType(Ty, (SILValueCategory)TyCategory);
+    SILType ValType = addrType.getObjectType();
+    auto Qualifier = StoreOwnershipQualifier(Attr);
+    ResultVal = Builder.createAtomicXchg(Loc, getLocalValue(ValID, ValType),
+                                         getLocalValue(ValID2, addrType), Qualifier);
+    break;
+  }
   case SILInstructionKind::StoreBorrowInst: {
     auto Ty = MF->getType(TyID);
     SILType addrType = getSILType(Ty, (SILValueCategory)TyCategory);

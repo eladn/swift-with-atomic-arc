@@ -95,6 +95,7 @@ public:
 
   MemBehavior visitLoadInst(LoadInst *LI);
   MemBehavior visitStoreInst(StoreInst *SI);
+  MemBehavior visitAtomicXchgInst(AtomicXchgInst *AXI);
   MemBehavior visitApplyInst(ApplyInst *AI);
   MemBehavior visitTryApplyInst(TryApplyInst *AI);
   MemBehavior visitBuiltinInst(BuiltinInst *BI);
@@ -191,6 +192,27 @@ MemBehavior MemoryBehaviorVisitor::visitStoreInst(StoreInst *SI) {
   DEBUG(llvm::dbgs() << "  Could not prove store does not alias inst. "
                         "Returning MayWrite.\n");
   return MemBehavior::MayWrite;
+}
+
+MemBehavior MemoryBehaviorVisitor::visitAtomicXchgInst(AtomicXchgInst *AXI) {
+  // No store besides the initialization of a "let"-variable
+  // can have any effect on the value of this "let" variable.
+  if (isLetPointer(V) && AXI->getDest() != V)
+    return MemBehavior::MayRead;  // FIXME
+
+  // If the store dest cannot alias the pointer in question, then the
+  // specified value cannot be modified by the store.
+  if (AA->isNoAlias(AXI->getDest(), V, computeTBAAType(AXI->getDest()),
+                    getValueTBAAType())) {
+    DEBUG(llvm::dbgs() << "  AtomicXchg Dst does not alias inst. Returning "
+                          "None.\n");
+    return MemBehavior::MayRead;  // FIXME
+  }
+
+  // Otherwise, a store just writes.
+  DEBUG(llvm::dbgs() << "  Could not prove AtomicXchg does not alias inst. "
+                        "Returning MayWrite.\n");
+  return MemBehavior::MayReadWrite;  // FIXME
 }
 
 MemBehavior MemoryBehaviorVisitor::visitBuiltinInst(BuiltinInst *BI) {

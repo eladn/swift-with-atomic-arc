@@ -1273,7 +1273,34 @@ protected:
                      isTakeFlag, IsInitialization);
     pass.markDead(storeInst);
   }
+/*
+  void visitAtomicXchgInst(AtomicXchgInst *atomicXchgInst) {
+    SILValue srcVal = atomicXchgInst->getSrc();
+    assert(currOper->get() == srcVal);
 
+    ValueStorage &storage = pass.valueStorageMap.getStorage(srcVal);
+    SILValue srcAddr = storage.storageAddress;
+
+    IsTake_t isTakeFlag = IsTake;
+    assert(atomicXchgInst->getOwnershipQualifier()
+           == StoreOwnershipQualifier::Unqualified);
+
+    if (storage.isProjection()) {
+      assert(!srcAddr);
+      auto *copyInst = cast<CopyValueInst>(srcVal);
+      ValueStorage &srcStorage =
+              pass.valueStorageMap.getStorage(copyInst->getOperand());
+      assert(!srcStorage.isProjection());
+      srcAddr = srcStorage.storageAddress;
+      isTakeFlag = IsNotTake;
+    }
+    // Bitwise copy the value. Two locations now share ownership. This is
+    // modeled as a take-init.
+    B.createCopyAddr(atomicXchgInst->getLoc(), srcAddr, atomicXchgInst->getDest(),
+                     isTakeFlag, IsInitialization);
+    pass.markDead(atomicXchgInst);
+  }
+*/
   void visitTupleInst(TupleInst *tupleInst) {
     // Tuples are rewritten on the def-side, where both direct and indirect
     // elements are composed.

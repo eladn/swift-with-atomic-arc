@@ -1682,6 +1682,67 @@ public:
     }
   }
 
+  void checkAtomicXchgInst(AtomicXchgInst *AXI) {
+    require(AXI->getSrc()->getType().isObject(),
+            "Can't store from an address source");
+    require(!fnConv.useLoweredAddresses()
+            || AXI->getSrc()->getType().isLoadable(AXI->getModule()),
+            "Can't store a non loadable type");
+    require(AXI->getDest()->getType().isAddress(),
+            "Must store to an address dest");
+    require(AXI->getDest()->getType().getObjectType() == AXI->getSrc()->getType(),
+            "Store operand type and dest type mismatch");
+
+    // Copied from checkLoadInst()
+    require(AXI->getType().isObject(), "Result of load must be an object");
+    require(!fnConv.useLoweredAddresses()
+            || AXI->getType().isLoadable(AXI->getModule()),
+            "Load must have a loadable type");
+    require(AXI->getDest()->getType().isAddress(),
+            "Load operand must be an address");
+    require(AXI->getDest()->getType().getObjectType() == AXI->getType(),
+            "Load operand type and result type mismatch");
+
+    // Copied from checkLoadInst()
+    /*require(F.hasQualifiedOwnership(),
+            "Load with qualified ownership in an unqualified function");*/
+    // TODO: Could probably make this a bit stricter.
+    require(!AXI->getType().isTrivial(AXI->getModule()),
+            "load [copy] or load [take] can only be applied to non-trivial "
+            "types");
+
+    // Perform ownership checks.
+    switch (AXI->getOwnershipQualifier()) {
+      case StoreOwnershipQualifier::Unqualified:
+        // We should not see loads with unqualified ownership when SILOwnership is
+        // enabled.
+        require(!F.hasQualifiedOwnership(),
+                "Qualified store in function with unqualified ownership?!");
+        break;
+      case StoreOwnershipQualifier::Init:
+      case StoreOwnershipQualifier::Assign:
+        require(
+                F.hasQualifiedOwnership(),
+                "Inst with qualified ownership in a function that is not qualified");
+        // TODO: Could probably make this a bit stricter.
+        require(!AXI->getSrc()->getType().isTrivial(AXI->getModule()),
+                "store [init] or store [assign] can only be applied to "
+                "non-trivial types");
+        break;
+      case StoreOwnershipQualifier::Trivial: {
+        require(
+                F.hasQualifiedOwnership(),
+                "Inst with qualified ownership in a function that is not qualified");
+        SILValue Src = AXI->getSrc();
+        require(Src->getType().isTrivial(AXI->getModule()) ||
+                Src.getOwnershipKind() == ValueOwnershipKind::Trivial,
+                "A store with trivial ownership must store a type with trivial "
+                "ownership");
+        break;
+      }
+    }
+  }
+
   void checkAssignInst(AssignInst *AI) {
     SILValue Src = AI->getSrc(), Dest = AI->getDest();
     require(AI->getModule().getStage() == SILStage::Raw,

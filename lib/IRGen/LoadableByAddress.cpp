@@ -494,6 +494,8 @@ struct StructLoweringState {
   SmallVector<MethodInst *, 16> methodInstsToMod;
   // Large loadable store instrs should call the outlined copy
   SmallVector<StoreInst *, 16> storeInstsToMod;
+  // Large loadable atomic-exchange instrs should call the outlined copy
+  SmallVector<AtomicXchgInst *, 16> atomicXchgInstsToMod;
   // All switch_enum instrs that should be converted to switch_enum_addr
   SmallVector<SwitchEnumInst *, 16> switchEnumInstsToMod;
   // All struct_extract instrs that should be converted to struct_element_addr
@@ -547,6 +549,7 @@ protected:
   void visitApply(ApplySite applySite);
   void visitMethodInst(MethodInst *instr);
   void visitStoreInst(StoreInst *instr);
+  void visitAtomicXchgInst(AtomicXchgInst *instr);
   void visitSwitchEnumInst(SwitchEnumInst *instr);
   void visitStructExtractInst(StructExtractInst *instr);
   void visitRetainInst(RetainValueInst *instr);
@@ -778,6 +781,14 @@ void LargeValueVisitor::visitStoreInst(StoreInst *instr) {
   if (std::find(pass.largeLoadableArgs.begin(), pass.largeLoadableArgs.end(),
                 src) != pass.largeLoadableArgs.end()) {
     pass.storeInstsToMod.push_back(instr);
+  }
+}
+
+void LargeValueVisitor::visitAtomicXchgInst(AtomicXchgInst *instr) {
+  SILValue src = instr->getSrc();
+  if (std::find(pass.largeLoadableArgs.begin(), pass.largeLoadableArgs.end(),
+                src) != pass.largeLoadableArgs.end()) {
+    pass.atomicXchgInstsToMod.push_back(instr);
   }
 }
 
@@ -1053,6 +1064,12 @@ void LoadableStorageAllocation::replaceLoadWithCopyAddr(
       pass.storeInstsToMod.push_back(insToInsert);
       break;
     }
+    case SILInstructionKind::AtomicXchgInst: {
+      auto *insToInsert = dyn_cast<AtomicXchgInst>(userIns);
+      assert(insToInsert && "Unexpected cast failure");
+      pass.atomicXchgInstsToMod.push_back(insToInsert);
+      break;
+    }
     case SILInstructionKind::DebugValueInst: {
       auto *insToInsert = dyn_cast<DebugValueInst>(userIns);
       assert(insToInsert && "Unexpected cast failure");
@@ -1195,6 +1212,13 @@ void LoadableStorageAllocation::replaceLoadWithCopyAddrForModifiable(
       auto *insToInsert = dyn_cast<StoreInst>(userIns);
       assert(insToInsert && "Unexpected cast failure");
       pass.storeInstsToMod.push_back(insToInsert);
+      usersToMod.push_back(user);
+      break;
+    }
+    case SILInstructionKind::AtomicXchgInst: {
+      auto *insToInsert = dyn_cast<AtomicXchgInst>(userIns);
+      assert(insToInsert && "Unexpected cast failure");
+      pass.atomicXchgInstsToMod.push_back(insToInsert);
       usersToMod.push_back(user);
       break;
     }
@@ -1579,6 +1603,15 @@ static void setInstrUsers(StructLoweringState &pass, AllocStackInst *allocInstr,
       SILValue tgt = storeUser->getDest();
       createOutlinedCopyCall(copyBuilder, allocInstr, tgt, pass);
       storeUser->eraseFromParent();
+    } else if (auto *atomicXchgUser = dyn_cast<AtomicXchgInst>(user)) {
+      // Optimization: replace with copy_addr to reduce code size
+      assert(std::find(pass.atomicXchgInstsToMod.begin(), pass.atomicXchgInstsToMod.end(),
+                       atomicXchgUser) == pass.atomicXchgInstsToMod.end() &&
+             "Did not expect this instr in atomicXchgInstsToMod");
+      SILBuilderWithScope copyBuilder(storeUser);
+      SILValue tgt = atomicXchgUser->getDest();
+      createOutlinedCopyCall(copyBuilder, allocInstr, tgt, pass);
+      atomicXchgUser->eraseFromParent();
     } else if (auto *dbgInst = dyn_cast<DebugValueInst>(user)) {
       SILBuilderWithScope dbgBuilder(dbgInst);
       // Rewrite the debug_value to point to the variable in the alloca.
@@ -2011,6 +2044,20 @@ static void rewriteFunction(StructLoweringState &pass,
   }
 
   for (StoreInst *instr : pass.storeInstsToMod) {
+    SILValue src = instr->getSrc();
+    SILValue tgt = instr->getDest();
+    SILType srcType = src->getType();
+    SILType tgtType = tgt->getType();
+    assert(srcType && "Expected an address-type source");
+    assert(tgtType.isAddress() && "Expected an address-type target");
+    assert(srcType == tgtType && "Source and target type do not match");
+
+    SILBuilderWithScope copyBuilder(instr);
+    createOutlinedCopyCall(copyBuilder, src, tgt, pass);
+    instr->getParent()->erase(instr);
+  }
+
+  for (AtomicXchgInst *instr : pass.atomicXchgInstsToMod) {
     SILValue src = instr->getSrc();
     SILValue tgt = instr->getDest();
     SILType srcType = src->getType();

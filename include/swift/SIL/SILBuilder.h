@@ -645,6 +645,53 @@ public:
                                                 DestAddr, Qualifier));
   }
 
+  AtomicXchgInst *createAtomicXchg(SILLocation Loc, SILValue Src, SILValue DestAddr,
+                                   StoreOwnershipQualifier Qualifier) {
+    assert((Qualifier != StoreOwnershipQualifier::Unqualified) ||
+           !getFunction().hasQualifiedOwnership() &&
+           "Unqualified inst in qualified function");
+    assert((Qualifier == StoreOwnershipQualifier::Unqualified) ||
+           getFunction().hasQualifiedOwnership() &&
+           "Qualified inst in unqualified function");
+    assert(DestAddr->getType().isLoadableOrOpaque(getModule()));  // check copied from createLoad().
+    return insert(new (getModule()) AtomicXchgInst(getSILDebugLocation(Loc), Src,
+                                                   DestAddr, Qualifier));
+  }
+
+  /// Convenience function for calling emitStore on the type lowering for
+  /// non-address values.
+  SILValue emitAtomicXchgValueOperation(SILLocation Loc, SILValue Src, SILValue DestAddr,
+                                        StoreOwnershipQualifier Qualifier) {
+    assert(!Src->getType().isAddress());
+    assert(DestAddr->getType().isLoadableOrOpaque(getModule()));
+    const auto &lowering = getTypeLowering(Src->getType());
+    return lowering.emitAtomicXchg(*this, Loc, Src, DestAddr, Qualifier);
+  }
+
+  /// Utility function that returns a trivial atomic-exchange if the stored type is
+  /// trivial and a \p Qualifier store if the stored type is non-trivial.
+  ///
+  /// *NOTE* The SupportUnqualifiedSIL is an option to ease the bring up of
+  /// Semantic SIL. It enables a pass that must be able to run on both Semantic
+  /// SIL and non-Semantic SIL. It has a default argument of false, so if this
+  /// is not necessary for your pass, just ignore the parameter.
+  AtomicXchgInst *createTrivialAtomicXchgOr(SILLocation Loc, SILValue Src,
+                                            SILValue DestAddr,
+                                            StoreOwnershipQualifier Qualifier,
+                                            bool SupportUnqualifiedSIL = false) {
+    if (SupportUnqualifiedSIL && !getFunction().hasQualifiedOwnership()) {
+      assert(
+              Qualifier != StoreOwnershipQualifier::Assign &&
+              "In unqualified SIL, assigns must be represented via 2 instructions");
+      return createAtomicXchg(Loc, Src, DestAddr,
+                              StoreOwnershipQualifier::Unqualified);
+    }
+    if (Src->getType().isTrivial(getModule())) {
+      return createAtomicXchg(Loc, Src, DestAddr, StoreOwnershipQualifier::Trivial);
+    }
+    return createAtomicXchg(Loc, Src, DestAddr, Qualifier);
+  }
+
   /// Convenience function for calling emitStore on the type lowering for
   /// non-address values.
   void emitStoreValueOperation(SILLocation Loc, SILValue Src, SILValue DestAddr,

@@ -475,6 +475,12 @@ struct OwnershipQualifiedKindVisitor : SILInstructionVisitor<OwnershipQualifiedK
       return OwnershipQualifiedKind::Unqualified;
     return OwnershipQualifiedKind::Qualified;
   }
+
+  OwnershipQualifiedKind visitAtomicXchgInst(AtomicXchgInst *AXI) {
+    if (AXI->getOwnershipQualifier() == StoreOwnershipQualifier::Unqualified)
+      return OwnershipQualifiedKind::Unqualified;
+    return OwnershipQualifiedKind::Qualified;
+  }
 };
 
 } // end anonymous namespace

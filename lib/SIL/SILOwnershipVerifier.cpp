@@ -1051,6 +1051,19 @@ OwnershipCompatibilityUseChecker::visitStoreInst(StoreInst *I) {
 }
 
 OwnershipUseCheckerResult
+OwnershipCompatibilityUseChecker::visitAtomicXchgInst(AtomicXchgInst *I) {
+  if (getValue() == I->getSrc()) {
+    if (isAddressOrTrivialType()) {
+      return {compatibleWithOwnership(ValueOwnershipKind::Trivial),
+              UseLifetimeConstraint::MustBeLive};
+    }
+    return {compatibleWithOwnership(ValueOwnershipKind::Owned),
+            UseLifetimeConstraint::MustBeInvalidated};
+  }
+  return {true, UseLifetimeConstraint::MustBeLive};
+}
+
+OwnershipUseCheckerResult
 OwnershipCompatibilityUseChecker::visitCopyBlockWithoutEscapingInst(
     CopyBlockWithoutEscapingInst *I) {
   // Consumes the closure parameter.

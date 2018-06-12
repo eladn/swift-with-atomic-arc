@@ -910,6 +910,15 @@ public:
     return true;
   }
 
+  bool visitAtomicXchgInst(AtomicXchgInst *AXI) {
+    if (CurrentOp.get()->getOperandNumber() != 1) {
+      DEBUG(llvm::dbgs() << "    FAIL! Found atomic_exchange of pointer: " << *AXI);
+      return false;
+    }
+    Mutations.push_back(AXI);
+    return true;
+  }
+
   bool visitAssignInst(AssignInst *AI) {
     if (CurrentOp.get()->getOperandNumber() != 1) {
       DEBUG(llvm::dbgs() << "    FAIL! Found store of pointer: " << *AI);

@@ -1282,6 +1282,13 @@ public:
     *this << getIDAndType(SI->getDest());
   }
 
+  // FIXME: change it..
+  void visitAtomicXchgInst(AtomicXchgInst *AXI) {
+    *this << Ctx.getID(AXI->getSrc()) << " to ";
+    printStoreOwnershipQualifier(AXI->getOwnershipQualifier());
+    *this << getIDAndType(AXI->getDest());
+  }
+
   void visitStoreBorrowInst(StoreBorrowInst *SI) {
     *this << Ctx.getID(SI->getSrc()) << " to ";
     *this << getIDAndType(SI->getDest());

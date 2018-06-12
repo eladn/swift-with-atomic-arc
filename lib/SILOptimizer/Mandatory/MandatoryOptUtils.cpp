@@ -66,10 +66,18 @@ void swift::lowerAssignInstruction(SILBuilderWithScope &B, AssignInst *Inst,
     // Factory initializers give us a whole new instance, so the existing
     // instance, which has not been initialized and never will be, must be
     // freed using dealloc_partial_ref.
+
+    // AtomicXchg: Here we replaced the old load+store with a single
+    // AtomicXchg SIL-instruction.
+
     SILValue Pointer =
         B.createLoad(Loc, Inst->getDest(), LoadOwnershipQualifier::Take);
     B.createStore(Loc, Src, Inst->getDest(), StoreOwnershipQualifier::Init);
-
+/*
+    SILValue Pointer =
+            B.createAtomicXchg(Loc, Inst->getSrc(), Inst->getDest(),
+                               StoreOwnershipQualifier::Init);
+*/
     auto MetatypeTy = CanMetatypeType::get(
         Inst->getDest()->getType().getASTType(), MetatypeRepresentation::Thick);
     auto SILMetatypeTy = SILType::getPrimitiveObjectType(MetatypeTy);
@@ -88,10 +96,21 @@ void swift::lowerAssignInstruction(SILBuilderWithScope &B, AssignInst *Inst,
 
   // This is basically TypeLowering::emitStoreOfCopy, except that if we have
   // a known incoming value, we can avoid the load.
+
+
+  // AtomicXchg: Here we replaced the old load+store with a single
+  // AtomicXchg SIL-instruction.
+/*
   SILValue IncomingVal =
       B.createLoad(Loc, Inst->getDest(), LoadOwnershipQualifier::Take);
   B.createStore(Inst->getLoc(), Src, Inst->getDest(),
                 StoreOwnershipQualifier::Init);
+*/
+
+  SILValue IncomingVal =
+      B.createAtomicXchg(Loc, Inst->getSrc(), Inst->getDest(),
+                StoreOwnershipQualifier::Init);
+
 
   B.emitDestroyValueOperation(Loc, IncomingVal);
   Inst->eraseFromParent();

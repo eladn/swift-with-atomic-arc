@@ -1639,6 +1639,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   case SILInstructionKind::AssignInst:
   case SILInstructionKind::CopyAddrInst:
   case SILInstructionKind::StoreInst:
+  case SILInstructionKind::AtomicXchgInst:
   case SILInstructionKind::StoreBorrowInst:
   case SILInstructionKind::StoreUnownedInst:
   case SILInstructionKind::StoreWeakInst: {
@@ -1656,6 +1657,10 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
       Attr = unsigned(cast<StoreInst>(&SI)->getOwnershipQualifier());
       operand = cast<StoreInst>(&SI)->getDest();
       value = cast<StoreInst>(&SI)->getSrc();
+    } else if (SI.getKind() == SILInstructionKind::AtomicXchgInst) {
+      Attr = unsigned(cast<AtomicXchgInst>(&SI)->getOwnershipQualifier());
+      operand = cast<AtomicXchgInst>(&SI)->getDest();
+      value = cast<AtomicXchgInst>(&SI)->getSrc();
     } else if (SI.getKind() == SILInstructionKind::AssignInst) {
       operand = cast<AssignInst>(&SI)->getDest();
       value = cast<AssignInst>(&SI)->getSrc();

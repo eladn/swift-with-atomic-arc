@@ -289,6 +289,10 @@ protected:
                         NumLoadOwnershipQualifierBits,
     OwnershipQualifier : NumLoadOwnershipQualifierBits
   );
+  SWIFT_INLINE_BITFIELD(AtomicXchgInst, SingleValueInstruction,
+                        NumStoreOwnershipQualifierBits,
+    OwnershipQualifier : NumStoreOwnershipQualifierBits
+  );
 
   SWIFT_INLINE_BITFIELD(UncheckedOwnershipConversionInst,SingleValueInstruction,
                         NumVOKindBits,

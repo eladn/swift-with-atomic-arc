@@ -409,6 +409,8 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
                     SingleValueInstruction, None, DoesNotRelease)
   SINGLE_VALUE_INST(ProjectExistentialBoxInst, project_existential_box,
                     SingleValueInstruction, None, DoesNotRelease)
+  SINGLE_VALUE_INST(AtomicXchgInst, atomic_xchg,
+                    SingleValueInstruction, MayReadWrite, DoesNotRelease)
 
   // Function Application
   SINGLE_VALUE_INST(ApplyInst, apply,

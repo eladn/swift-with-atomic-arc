@@ -452,6 +452,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::RefToUnmanagedInst:
   case SILInstructionKind::RefToUnownedInst:
   case SILInstructionKind::StoreInst:
+  case SILInstructionKind::AtomicXchgInst:  // FIXME
   case SILInstructionKind::StoreBorrowInst:
   case SILInstructionKind::StoreUnownedInst:
   case SILInstructionKind::StoreWeakInst:

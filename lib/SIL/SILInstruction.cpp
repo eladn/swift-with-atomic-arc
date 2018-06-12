@@ -445,6 +445,12 @@ namespace {
         X->getOwnershipQualifier() == RHS->getOwnershipQualifier();
     }
 
+    bool visitAtomicXchgInst(const AtomicXchgInst *RHS) {
+      auto *X = cast<AtomicXchgInst>(LHS);
+      return X->getSrc() == RHS->getSrc() && X->getDest() == RHS->getDest() &&
+             X->getOwnershipQualifier() == RHS->getOwnershipQualifier();
+    }
+
     bool visitBindMemoryInst(const BindMemoryInst *RHS) {
       auto *X = cast<BindMemoryInst>(LHS);
       return X->getBoundType() == RHS->getBoundType();

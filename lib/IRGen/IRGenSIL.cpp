@@ -943,6 +943,7 @@ public:
 
   void visitLoadInst(LoadInst *i);
   void visitStoreInst(StoreInst *i);
+  void visitAtomicXchgInst(AtomicXchgInst *i);
   void visitAssignInst(AssignInst *i) {
     llvm_unreachable("assign is not valid in canonical SIL");
   }
@@ -3620,6 +3621,36 @@ void IRGenSILFunction::visitStoreInst(swift::StoreInst *i) {
   case StoreOwnershipQualifier::Assign:
     typeInfo.assign(*this, source, dest, false);
     break;
+  }
+}
+
+void IRGenSILFunction::visitAtomicXchgInst(swift::AtomicXchgInst *i) {
+  Explosion newValueSource = getLoweredExplosion(i->getSrc());
+  Address destAddr = getLoweredAddress(i->getDest());
+  SILType objType = i->getSrc()->getType().getObjectType();
+  const auto &typeInfo = cast<LoadableTypeInfo>(getTypeInfo(objType));
+
+  // load
+  Explosion lowered;
+  typeInfo.loadAsTake(*this, destAddr, lowered);
+  if (isInvariantAddress(i->getDest())) {
+    // It'd be better to push this down into `loadAs` methods, perhaps...
+    for (auto value : lowered.getAll())
+      if (auto load = dyn_cast<llvm::LoadInst>(value))
+        setInvariantLoad(load);
+  }
+  setLoweredExplosion(i, lowered);
+
+  // store
+  switch (i->getOwnershipQualifier()) {
+    case StoreOwnershipQualifier::Unqualified:
+    case StoreOwnershipQualifier::Init:
+    case StoreOwnershipQualifier::Trivial:
+      typeInfo.initialize(*this, newValueSource, destAddr, false);
+      break;
+    case StoreOwnershipQualifier::Assign:
+      typeInfo.assign(*this, newValueSource, destAddr, false);
+      break;
   }
 }
 

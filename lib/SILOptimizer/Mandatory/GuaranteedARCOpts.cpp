@@ -73,6 +73,7 @@ bool GuaranteedARCOptsVisitor::visitDestroyAddrInst(DestroyAddrInst *DAI) {
 static bool couldReduceStrongRefcount(SILInstruction *Inst) {
   // Simple memory accesses cannot reduce refcounts.
   if (isa<LoadInst>(Inst) || isa<StoreInst>(Inst) ||
+      isa<AtomicXchgInst>(Inst) ||
       isa<RetainValueInst>(Inst) || isa<UnownedRetainInst>(Inst) ||
       isa<UnownedReleaseInst>(Inst) || isa<StrongRetainUnownedInst>(Inst) ||
       isa<StoreWeakInst>(Inst) || isa<StrongRetainInst>(Inst) ||
