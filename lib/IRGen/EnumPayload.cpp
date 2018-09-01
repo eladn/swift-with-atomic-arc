@@ -47,6 +47,14 @@ EnumPayload EnumPayload::zero(IRGenModule &IGM, EnumPayloadSchema schema) {
   return result;
 }
 
+EnumPayload EnumPayload::createZeroOfSameSchema() const {
+  EnumPayload result = EnumPayload();
+  for (auto value : PayloadValues) {
+    result.PayloadValues.push_back(getPayloadType(value));
+  }
+  return result;
+}
+
 EnumPayload EnumPayload::fromBitPattern(IRGenModule &IGM,
                                         APInt bitPattern,
                                         EnumPayloadSchema schema) {
@@ -371,6 +379,27 @@ void EnumPayload::store(IRGenFunction &IGF, Address address) const {
                        .getTypeAllocSize(valueToStore->getType()));
     }
   }
+}
+
+EnumPayload EnumPayload::atomic_load_old_and_store_this(IRGenFunction &IGF,
+                                                        Address address) const {
+  assert(PayloadValues.size() == 1);
+  EnumPayload result = createZeroOfSameSchema(); //EnumPayload::zero(IGF.IGM, schema);
+  assert(result.PayloadValues.size() == 1);
+
+  auto storageTy = getPayloadStorageType(IGF.IGM, *this);
+  address = IGF.Builder.CreateBitCast(address, storageTy->getPointerTo());
+
+  // non-atomic impl:
+  /*result.PayloadValues.front() = IGF.Builder.CreateLoad(address);
+  IGF.Builder.CreateStore(forcePayloadValue(PayloadValues.front()), address);*/
+
+  llvm::Value *oldValue =
+          IGF.Builder.CreateCASLoop(address,
+                                    forcePayloadValue(PayloadValues.front()));
+  result.PayloadValues.front() = oldValue;
+
+  return result;
 }
 
 namespace {

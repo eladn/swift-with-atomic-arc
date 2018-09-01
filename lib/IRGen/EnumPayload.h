@@ -109,6 +109,10 @@ public:
   static EnumPayload zero(IRGenModule &IGM,
                           EnumPayloadSchema schema);
 
+  /// Generate a "zero" enum payload from the same schema
+  /// of the current payload.
+  EnumPayload createZeroOfSameSchema() const;
+
   /// Generate an enum payload containing the given bit pattern.
   static EnumPayload fromBitPattern(IRGenModule &IGM,
                                     APInt bitPattern,
@@ -153,6 +157,11 @@ public:
   
   /// Store an enum payload to memory.
   void store(IRGenFunction &IGF, Address address) const;
+
+  /// Atomically Load an enum payload from memory,
+  /// and store an enum payload to memory.
+  EnumPayload atomic_load_old_and_store_this(IRGenFunction &IGF,
+                                             Address address) const;
 
   /// Emit a switch over specific bit patterns for the payload.
   /// The value will be tested as if AND-ed against the given mask.

@@ -104,6 +104,27 @@ public:
   static bool classof(const TypeInfo *type) {
     return type->getSpecialTypeInfoKind() == SpecialTypeInfoKind::Reference;
   }
+
+  virtual void atomic_load_and_assign(IRGenFunction &IGF,
+                              Explosion &newExplosion,
+                              Explosion &oldExplosion,
+                              Address addr,
+                              bool isOutlined) const override {
+    assert(0 && "ReferenceTypeInfo::atomic_load_and_assign() not implemeted!");
+    // TODO: impl!
+  }
+
+  virtual void atomic_load_and_initialize(IRGenFunction &IGF,
+                                  Explosion &newExplosion,
+                                  Explosion &oldExplosion,
+                                  Address addr,
+                                  bool isOutlined) const override {
+    assert(0 && "ReferenceTypeInfo::atomic_load_and_initialize() not implemeted!");
+    // TODO: impl!
+    //addr = asDerived().projectScalar(IGF, addr);
+    //llvm::Value * oldValue = IGF.Builder.CreateCASLoop(addr, newExplosion.claimNext());
+    //oldExplosion.add(oldValue);
+  }
 };
 
 }

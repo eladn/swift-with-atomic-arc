@@ -936,6 +936,25 @@ namespace {
       addr = IGF.Builder.CreateElementBitCast(addr, ScalarType);
       IGF.Builder.CreateStore(explosion.claimNext(), addr);
     }
+
+    void atomic_load_and_assign(IRGenFunction &IGF,
+                                Explosion &newExplosion,
+                                Explosion &oldExplosion,
+                                Address addr,
+                                bool isOutlined) const override {
+      return atomic_load_and_initialize(IGF, newExplosion, oldExplosion,
+                                        addr, isOutlined);
+    }
+
+    void atomic_load_and_initialize(IRGenFunction &IGF,
+                                    Explosion &newExplosion,
+                                    Explosion &oldExplosion,
+                                    Address addr,
+                                    bool isOutlined) const override {
+      addr = IGF.Builder.CreateElementBitCast(addr, ScalarType);
+      llvm::Value * oldValue = IGF.Builder.CreateCASLoop(addr, newExplosion.claimNext());
+      oldExplosion.add(oldValue);
+    }
     
     void reexplode(IRGenFunction &IGF, Explosion &sourceExplosion,
                    Explosion &targetExplosion) const override {

@@ -97,9 +97,30 @@ public:
   virtual void assign(IRGenFunction &IGF, Explosion &explosion, Address addr,
                       bool isOutlined) const = 0;
 
+  /// Atomically load an explosion of values from an address and assign
+  /// a set of exploded values into that address.
+  /// The values are consumed out of the explosion.
+  virtual void atomic_load_and_assign(IRGenFunction &IGF, Explosion &newExplosion,
+                                      Explosion &oldExplosion, Address addr,
+                                      bool isOutlined) const {
+    loadAsTake(IGF, addr, oldExplosion);
+    assign(IGF, newExplosion, addr, isOutlined);
+  }
+
   /// Initialize an address by consuming values out of an explosion.
   virtual void initialize(IRGenFunction &IGF, Explosion &explosion,
                           Address addr, bool isOutlined) const = 0;
+
+  /// Atomically load an explosion of values from an address and initialize
+  /// that address by consuming values out of an explosion.
+  virtual void atomic_load_and_initialize(IRGenFunction &IGF,
+                                          Explosion &newExplosion,
+                                          Explosion &oldExplosion,
+                                          Address addr,
+                                          bool isOutlined) const {
+    loadAsTake(IGF, addr, oldExplosion);
+    initialize(IGF, newExplosion, addr, isOutlined);
+  }
 
   // We can give this a reasonable default implementation.
   void initializeWithCopy(IRGenFunction &IGF, Address destAddr, Address srcAddr,

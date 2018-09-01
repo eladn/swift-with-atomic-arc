@@ -402,8 +402,18 @@ public:
                           Explosion &e) const = 0;
   virtual void assign(IRGenFunction &IGF, Explosion &e, Address addr,
                       bool isOutlined) const = 0;
+  virtual void atomic_load_and_assign(IRGenFunction &IGF,
+                                      Explosion &newExplosion,
+                                      Explosion &oldExplosion,
+                                      Address addr,
+                                      bool isOutlined) const = 0;
   virtual void initialize(IRGenFunction &IGF, Explosion &e, Address addr,
                           bool isOutlined) const = 0;
+  virtual void atomic_load_and_initialize(IRGenFunction &IGF,
+                                          Explosion &newExplosion,
+                                          Explosion &oldExplosion,
+                                          Address addr,
+                                          bool isOutlined) const = 0;
   virtual void reexplode(IRGenFunction &IGF, Explosion &src,
                          Explosion &dest) const = 0;
   virtual void copy(IRGenFunction &IGF, Explosion &src,

@@ -123,6 +123,25 @@ public:
     IGF.Builder.CreateStore(src.claimNext(), addr);
   }
 
+  void atomic_load_and_assign(IRGenFunction &IGF,
+                              Explosion &newExplosion,
+                              Explosion &oldExplosion,
+                              Address addr,
+                              bool isOutlined) const override {
+    assert(0 && "atomic_load_and_assign() not implemeted!");
+    // TODO: impl!
+  }
+
+  void atomic_load_and_initialize(IRGenFunction &IGF,
+                                  Explosion &newExplosion,
+                                  Explosion &oldExplosion,
+                                  Address addr,
+                                  bool isOutlined) const override {
+    addr = asDerived().projectScalar(IGF, addr);
+    llvm::Value * oldValue = IGF.Builder.CreateCASLoop(addr, newExplosion.claimNext());
+    oldExplosion.add(oldValue);
+  }
+
   void loadAsCopy(IRGenFunction &IGF, Address addr,
                   Explosion &out) const override {
     addr = asDerived().projectScalar(IGF, addr);

@@ -830,6 +830,29 @@ public:
     asDerived().emitStoreOfTables(IGF, e, address);
   }
 
+  void atomic_load_and_assign(IRGenFunction &IGF,
+                              Explosion &newExplosion,
+                              Explosion &oldExplosion,
+                              Address addr,
+                              bool isOutlined) const override {
+    assert(0 && "ClassExistentialTypeInfo::atomic_load_and_assign() not implemeted!");
+    // TODO: impl!
+  }
+
+  void atomic_load_and_initialize(IRGenFunction &IGF,
+                                  Explosion &newExplosion,
+                                  Explosion &oldExplosion,
+                                  Address addr,
+                                  bool isOutlined) const override {
+    //assert(0 && "ClassExistentialTypeInfo::atomic_load_and_initialize() not implemeted!");
+    // FIXME: how can we do it atomically?
+    // FIXME: do we even want to do it atomically?
+    // FIXME: why do we reach here?
+
+    loadAsTake(IGF, addr, oldExplosion);
+    initialize(IGF, newExplosion, addr, isOutlined);
+  }
+
   void copy(IRGenFunction &IGF, Explosion &src, Explosion &dest,
             Atomicity atomicity)
   const override {

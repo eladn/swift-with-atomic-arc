@@ -485,6 +485,24 @@ namespace {
                                      isOutlined);
     }
 
+    void atomic_load_and_assign(IRGenFunction &IGF,
+                                Explosion &newExplosion,
+                                Explosion &oldExplosion,
+                                Address addr,
+                                bool isOutlined) const override {
+      assert(0 && "atomic_load_and_assign() not implemeted!");
+      // TODO: impl!
+    }
+
+    void atomic_load_and_initialize(IRGenFunction &IGF,
+                                    Explosion &newExplosion,
+                                    Explosion &oldExplosion,
+                                    Address addr,
+                                    bool isOutlined) const override {
+      assert(0 && "atomic_load_and_initialize() not implemented!");
+      // TODO: impl!
+    }
+
     void assignWithCopy(IRGenFunction &IGF, Address dest, Address src,
                         SILType T, bool isOutlined) const override {
       if (!getSingleton()) return;
@@ -1339,6 +1357,15 @@ namespace {
         consume(IGF, old, IGF.getDefaultAtomicity());
     }
 
+    void atomic_load_and_assign(IRGenFunction &IGF,
+                                Explosion &newExplosion,
+                                Explosion &oldExplosion,
+                                Address addr,
+                                bool isOutlined) const override {
+      assert(0 && "atomic_load_and_assign() not implemeted!");
+      // TODO: impl!
+    }
+
     void initialize(IRGenFunction &IGF, Explosion &e, Address addr,
                     bool isOutlined) const override {
       assert(TIK >= Loadable);
@@ -1346,6 +1373,20 @@ namespace {
       payload.store(IGF, projectPayload(IGF, addr));
       if (ExtraTagBitCount > 0)
         IGF.Builder.CreateStore(e.claimNext(), projectExtraTagBits(IGF, addr));
+    }
+
+    void atomic_load_and_initialize(IRGenFunction &IGF,
+                                    Explosion &newExplosion,
+                                    Explosion &oldExplosion,
+                                    Address addr,
+                                    bool isOutlined) const override {
+      assert(TIK >= Loadable);
+      assert(ExtraTagBitCount == 0);
+      assert(newExplosion.size() == 1);
+      auto newPayload = EnumPayload::fromExplosion(IGF.IGM, newExplosion, PayloadSchema);
+      auto oldPayload = newPayload.atomic_load_old_and_store_this(
+              IGF, projectPayload(IGF, addr));
+      oldPayload.explode(IGF.IGM, oldExplosion);
     }
 
     void collectMetadataForOutlining(OutliningMetadataCollector &collector,
@@ -5059,8 +5100,24 @@ namespace {
       llvm_unreachable("resilient enums are always indirect");
     }
 
+    void atomic_load_and_assign(IRGenFunction &IGF,
+                                Explosion &newExplosion,
+                                Explosion &oldExplosion,
+                                Address addr,
+                                bool isOutlined) const override {
+      llvm_unreachable("resilient enums are always indirect");
+    }
+
     void initialize(IRGenFunction &IGF, Explosion &e, Address addr,
                     bool isOutlined) const override {
+      llvm_unreachable("resilient enums are always indirect");
+    }
+
+    void atomic_load_and_initialize(IRGenFunction &IGF,
+                                    Explosion &newExplosion,
+                                    Explosion &oldExplosion,
+                                    Address addr,
+                                    bool isOutlined) const override {
       llvm_unreachable("resilient enums are always indirect");
     }
 
@@ -5438,9 +5495,31 @@ namespace {
                 bool isOutlined) const override {
       return Strategy.assign(IGF, e, addr, isOutlined);
     }
+    void atomic_load_and_assign(IRGenFunction &IGF,
+                                Explosion &newExplosion,
+                                Explosion &oldExplosion,
+                                Address addr,
+                                bool isOutlined) const override {
+      return Strategy.atomic_load_and_assign(IGF,
+                                             newExplosion,
+                                             oldExplosion,
+                                             addr,
+                                             isOutlined);
+    }
     void initialize(IRGenFunction &IGF, Explosion &e, Address addr,
                     bool isOutlined) const override {
       return Strategy.initialize(IGF, e, addr, isOutlined);
+    }
+    void atomic_load_and_initialize(IRGenFunction &IGF,
+                                    Explosion &newExplosion,
+                                    Explosion &oldExplosion,
+                                    Address addr,
+                                    bool isOutlined) const override {
+      return Strategy.atomic_load_and_initialize(IGF,
+                                                 newExplosion,
+                                                 oldExplosion,
+                                                 addr,
+                                                 isOutlined);
     }
     void reexplode(IRGenFunction &IGF, Explosion &src,
                    Explosion &dest) const override {

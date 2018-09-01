@@ -297,6 +297,27 @@ namespace {
         IGF.emitNativeStrongInit(context, dataAddr);
     }
 
+    void atomic_load_and_assign(IRGenFunction &IGF,
+                                Explosion &newExplosion,
+                                Explosion &oldExplosion,
+                                Address addr,
+                                bool isOutlined) const override {
+      assert(0 && "atomic_load_and_assign() not implemeted!");
+      // TODO: impl!
+    }
+
+    void atomic_load_and_initialize(IRGenFunction &IGF,
+                                    Explosion &newExplosion,
+                                    Explosion &oldExplosion,
+                                    Address addr,
+                                    bool isOutlined) const override {
+      assert(0 && "atomic_load_and_assign() not implemeted!");
+      // TODO: impl!
+      /*addr = asDerived().projectScalar(IGF, addr);
+      llvm::Value * oldValue = IGF.Builder.CreateCASLoop(addr, newExplosion.claimNext());
+      oldExplosion.add(oldValue);*/
+    }
+
     void copy(IRGenFunction &IGF, Explosion &src,
               Explosion &dest, Atomicity atomicity) const override {
       src.transferInto(dest, 1);
