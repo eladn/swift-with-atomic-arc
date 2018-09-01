@@ -3627,19 +3627,40 @@ void IRGenSILFunction::visitStoreInst(swift::StoreInst *i) {
 void IRGenSILFunction::visitAtomicXchgInst(swift::AtomicXchgInst *i) {
   Explosion newValueSource = getLoweredExplosion(i->getSrc());
   Address destAddr = getLoweredAddress(i->getDest());
+  Explosion loweredLoadedOldValue;
   SILType objType = i->getSrc()->getType().getObjectType();
   const auto &typeInfo = cast<LoadableTypeInfo>(getTypeInfo(objType));
 
-  // load
-  Explosion lowered;
-  typeInfo.loadAsTake(*this, destAddr, lowered);
+#ifndef ATOMIC_XCHG_NONATOMIC_IRGEN
+  switch (i->getOwnershipQualifier()) {
+    case StoreOwnershipQualifier::Unqualified:
+    case StoreOwnershipQualifier::Init:
+    case StoreOwnershipQualifier::Trivial:
+      typeInfo.atomic_load_and_initialize(*this, newValueSource,
+              loweredLoadedOldValue, destAddr, false);
+      break;
+    case StoreOwnershipQualifier::Assign:
+      typeInfo.atomic_load_and_assign(*this, newValueSource,
+              loweredLoadedOldValue, destAddr, false);
+      break;
+  }
   if (isInvariantAddress(i->getDest())) {
     // It'd be better to push this down into `loadAs` methods, perhaps...
-    for (auto value : lowered.getAll())
+    for (auto value : loweredLoadedOldValue.getAll())
       if (auto load = dyn_cast<llvm::LoadInst>(value))
         setInvariantLoad(load);
   }
-  setLoweredExplosion(i, lowered);
+  setLoweredExplosion(i, loweredLoadedOldValue);
+#else
+  // load
+  typeInfo.loadAsTake(*this, destAddr, loweredLoadedOldValue);
+  if (isInvariantAddress(i->getDest())) {
+    // It'd be better to push this down into `loadAs` methods, perhaps...
+    for (auto value : loweredLoadedOldValue.getAll())
+      if (auto load = dyn_cast<llvm::LoadInst>(value))
+        setInvariantLoad(load);
+  }
+  setLoweredExplosion(i, loweredLoadedOldValue);
 
   // store
   switch (i->getOwnershipQualifier()) {
@@ -3652,6 +3673,7 @@ void IRGenSILFunction::visitAtomicXchgInst(swift::AtomicXchgInst *i) {
       typeInfo.assign(*this, newValueSource, destAddr, false);
       break;
   }
+#endif /* ATOMIC_XCHG_NONATOMIC_IRGEN */
 }
 
 /// Emit the artificial error result argument.

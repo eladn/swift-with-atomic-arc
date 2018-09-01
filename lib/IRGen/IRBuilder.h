@@ -203,6 +203,51 @@ public:
     return CreateStore(value, addr.getAddress(), addr.getAlignment());
   }
 
+  using IRBuilderBase::CreateAtomicCmpXchg;
+
+  llvm::AtomicCmpXchgInst *CreateAtomicCmpXchg(Address addr,
+                                               llvm::Value *cmpValue,
+                                               llvm::Value *newValue) {
+    return CreateAtomicCmpXchg(addr.getAddress(), cmpValue, newValue);
+  }
+
+  llvm::AtomicCmpXchgInst *CreateAtomicCmpXchg(llvm::Value *addr,
+                                               llvm::Value *cmpValue,
+                                               llvm::Value *newValue) {
+    llvm::AtomicCmpXchgInst *atomicCmpXchg =
+            IRBuilderBase::CreateAtomicCmpXchg(addr, cmpValue, newValue,
+                                               llvm::AtomicOrdering::AcquireRelease,
+                                               llvm::AtomicOrdering::Monotonic);
+    atomicCmpXchg->setVolatile(true);
+    return atomicCmpXchg;
+  }
+
+  llvm::Value * CreateCASLoop(Address addr, llvm::Value *newValue) {
+    auto &Ctx = Context;  // IGF.IGM.getLLVMContext();
+    auto *origBB = GetInsertBlock();
+    auto *casLoopBB = llvm::BasicBlock::Create(Ctx); //IGF.createBasicBlock("name");
+    auto *casDoneBB = llvm::BasicBlock::Create(Ctx);
+
+    // FIXME: replace with %orig = load atomic i32, i32* %ptr unordered, align 4
+    auto orig = CreateLoad(addr);
+    orig->setAtomic(llvm::AtomicOrdering::Unordered);
+    orig->setVolatile(true); // FIXME: do we really need it?
+    CreateBr(casLoopBB);
+
+    emitBlock(casLoopBB);
+    auto cmp = CreatePHI(orig->getType() /*IGF.IGM.IntPtrTy*/, 2);
+    cmp->addIncoming(orig, origBB);
+
+    auto val_success = CreateAtomicCmpXchg(addr, cmp, newValue);
+    auto value_loaded = CreateExtractValue(val_success, {0});
+    cmp->addIncoming(value_loaded, casLoopBB);
+    auto success = CreateExtractValue(val_success, {1});
+    CreateCondBr(success, casDoneBB, casLoopBB);
+    emitBlock(casDoneBB);
+
+    return cmp;
+  }
+
   // These are deleted because we want to force the caller to specify
   // an alignment.
   llvm::LoadInst *CreateLoad(llvm::Value *addr,
