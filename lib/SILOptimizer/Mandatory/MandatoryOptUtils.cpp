@@ -97,20 +97,22 @@ void swift::lowerAssignInstruction(SILBuilderWithScope &B, AssignInst *Inst,
   // This is basically TypeLowering::emitStoreOfCopy, except that if we have
   // a known incoming value, we can avoid the load.
 
+  // For now, we replace load+store into atomic-xchg only for ClassType`
+  // FIXME: do it for more reference counted types (maybe not all of them..).
 
-  // AtomicXchg: Here we replaced the old load+store with a single
-  // AtomicXchg SIL-instruction.
-/*
-  SILValue IncomingVal =
-      B.createLoad(Loc, Inst->getDest(), LoadOwnershipQualifier::Take);
-  B.createStore(Inst->getLoc(), Src, Inst->getDest(),
-                StoreOwnershipQualifier::Init);
-*/
-
-  SILValue IncomingVal =
-      B.createAtomicXchg(Loc, Inst->getSrc(), Inst->getDest(),
-                StoreOwnershipQualifier::Init);
-
+  SILValue IncomingVal;
+  if (Inst->getDest()->getType().is<ClassType>()) {
+    // AtomicXchg: Here we replaced the old load+store with a single
+    // AtomicXchg SIL-instruction.
+    IncomingVal = B.createAtomicXchg(Loc, Inst->getSrc(), Inst->getDest(),
+                                     StoreOwnershipQualifier::Init);
+  } else {
+    // The original load+store (non atomic).
+    IncomingVal =
+            B.createLoad(Loc, Inst->getDest(), LoadOwnershipQualifier::Take);
+    B.createStore(Inst->getLoc(), Src, Inst->getDest(),
+                  StoreOwnershipQualifier::Init);
+  }
 
   B.emitDestroyValueOperation(Loc, IncomingVal);
   Inst->eraseFromParent();
