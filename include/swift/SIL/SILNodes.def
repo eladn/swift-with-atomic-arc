@@ -411,6 +411,8 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
                     SingleValueInstruction, None, DoesNotRelease)
   SINGLE_VALUE_INST(AtomicXchgInst, atomic_xchg,
                     SingleValueInstruction, MayReadWrite, DoesNotRelease)
+  SINGLE_VALUE_INST(AtomicLoadAndStrongRetainInst, atomic_load_and_strong_retain,
+                    SingleValueInstruction, MayHaveSideEffects, MayRelease)
 
   // Function Application
   SINGLE_VALUE_INST(ApplyInst, apply,

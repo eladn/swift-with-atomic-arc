@@ -1252,6 +1252,13 @@ public:
     *this << getIDAndType(LI->getOperand());
   }
 
+  void visitAtomicLoadAndStrongRetainInst(AtomicLoadAndStrongRetainInst *I) {
+    if (I->isNonAtomic())
+      *this << "[nonatomic] ";
+    printLoadOwnershipQualifier(I->getOwnershipQualifier());
+    *this << getIDAndType(I->getOperand());
+  }
+
   void visitLoadBorrowInst(LoadBorrowInst *LBI) {
     *this << getIDAndType(LBI->getOperand());
   }

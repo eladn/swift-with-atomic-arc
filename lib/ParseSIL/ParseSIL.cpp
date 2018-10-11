@@ -2768,6 +2768,28 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
    break;
  }
 
+ case SILInstructionKind::AtomicLoadAndStrongRetainInst: {
+   LoadOwnershipQualifier Qualifier;
+   SourceLoc AddrLoc;
+   Atomicity atomicity = Atomicity::Atomic;
+   StringRef Optional;
+
+   if (parseSILOptional(Optional, *this)) {
+     if (Optional == "nonatomic") {
+       atomicity = Atomicity::NonAtomic;
+     } else {
+       return true;
+     }
+   }
+
+   if (parseLoadOwnershipQualifier(Qualifier, *this) ||
+       parseTypedValueRef(Val, AddrLoc, B) || parseSILDebugLocation(InstLoc, B))
+     return true;
+
+   ResultVal = B.createAtomicLoadAndStrongRetain(InstLoc, Val, Qualifier, atomicity);
+   break;
+ }
+
  case SILInstructionKind::LoadBorrowInst: {
    SourceLoc AddrLoc;
 

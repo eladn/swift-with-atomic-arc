@@ -16,6 +16,8 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "irgensil"
+
+#include <llvm/Support/AtomicOrdering.h>
 #include "llvm/IR/DIBuilder.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/Module.h"
@@ -941,9 +943,13 @@ public:
   void visitStringLiteralInst(StringLiteralInst *i);
   void visitConstStringLiteralInst(ConstStringLiteralInst *i);
 
+  void emitLoad(SILValue source, SILType objType,
+                LoadOwnershipQualifier qualifier,
+                Explosion &lowered);
   void visitLoadInst(LoadInst *i);
   void visitStoreInst(StoreInst *i);
   void visitAtomicXchgInst(AtomicXchgInst *i);
+  void visitAtomicLoadAndStrongRetainInst(AtomicLoadAndStrongRetainInst *i);
   void visitAssignInst(AssignInst *i) {
     llvm_unreachable("assign is not valid in canonical SIL");
   }
@@ -3580,29 +3586,35 @@ static bool isInvariantAddress(SILValue v) {
   return false;
 }
 
-void IRGenSILFunction::visitLoadInst(swift::LoadInst *i) {
-  Explosion lowered;
-  Address source = getLoweredAddress(i->getOperand());
-  SILType objType = i->getType().getObjectType();
+void IRGenSILFunction::emitLoad(SILValue source, SILType objType,
+        LoadOwnershipQualifier qualifier, Explosion &lowered) {
+  Address source_addr = getLoweredAddress(source);
   const auto &typeInfo = cast<LoadableTypeInfo>(getTypeInfo(objType));
 
-  switch (i->getOwnershipQualifier()) {
-  case LoadOwnershipQualifier::Unqualified:
-  case LoadOwnershipQualifier::Trivial:
-  case LoadOwnershipQualifier::Take:
-    typeInfo.loadAsTake(*this, source, lowered);
-    break;
-  case LoadOwnershipQualifier::Copy:
-    typeInfo.loadAsCopy(*this, source, lowered);
-    break;
+  switch (qualifier) {
+    case LoadOwnershipQualifier::Unqualified:
+    case LoadOwnershipQualifier::Trivial:
+    case LoadOwnershipQualifier::Take:
+      typeInfo.loadAsTake(*this, source_addr, lowered);
+      break;
+    case LoadOwnershipQualifier::Copy:
+      typeInfo.loadAsCopy(*this, source_addr, lowered);
+      break;
   }
-  
-  if (isInvariantAddress(i->getOperand())) {
+
+  if (isInvariantAddress(source)) {
     // It'd be better to push this down into `loadAs` methods, perhaps...
     for (auto value : lowered.getAll())
       if (auto load = dyn_cast<llvm::LoadInst>(value))
         setInvariantLoad(load);
   }
+}
+
+void IRGenSILFunction::visitLoadInst(swift::LoadInst *i) {
+  Explosion lowered;
+  SILType objType = i->getType().getObjectType();
+  emitLoad(i->getOperand(), objType,i->getOwnershipQualifier(),
+          lowered);
   setLoweredExplosion(i, lowered);
 }
 
@@ -3674,6 +3686,80 @@ void IRGenSILFunction::visitAtomicXchgInst(swift::AtomicXchgInst *i) {
       break;
   }
 #endif /* ATOMIC_XCHG_NONATOMIC_IRGEN */
+}
+
+void IRGenSILFunction::visitAtomicLoadAndStrongRetainInst(
+        swift::AtomicLoadAndStrongRetainInst *i) {
+
+  // TODO: put it all inside of a helper function and just call it.
+
+  // TODO: check that the names are still ok when the cmd inserted more than once.
+  //auto *origBB = Builder.GetInsertBlock();
+  auto *loadLoopBB = createBasicBlock("LoadLoopBB");
+  auto *loadSucceedBB = createBasicBlock("LoadSucceedBB");
+  auto *loadAttemptFailedBB = createBasicBlock("LoadAttemptFailedBB");
+  SILType objType = i->getType().getObjectType();
+
+  // first load
+  Explosion lowered_first_load;
+  emitLoad(i->getOperand(), objType,
+           i->getOwnershipQualifier(),
+           lowered_first_load);
+
+  // local variable that stores the previous loaded value
+  llvm::Value *first_loaded_value = lowered_first_load.claimNext();
+  auto prev_loaded_local_variable = createAlloca(first_loaded_value->getType(), IGM.getPointerAlignment()); // objType.getAddressType()
+  Builder.CreateStore(first_loaded_value, prev_loaded_local_variable);
+
+  Builder.CreateBr(loadLoopBB);
+  Builder.emitBlock(loadLoopBB);
+
+  // get the previous loaded as a value (from the local variable).
+  auto prev_loaded_local_value = Builder.CreateLoad(prev_loaded_local_variable);
+
+  // retain
+  // for now: call the original strong retain.
+  // FIXME: call a modified `try_strong_retain` and check the result value.
+  Explosion prev_loaded_local_value_explosion;
+  prev_loaded_local_value_explosion.add(prev_loaded_local_value);
+  auto &ti = cast<ReferenceTypeInfo>(getTypeInfo(i->getType()));
+  ti.strongRetain(*this, prev_loaded_local_value_explosion,
+                  irgen::Atomicity::Atomic);
+
+  // memory fence
+  // FIXME: maybe the implicit fence of the atomic strong retain is enough?
+  // FIXME: what atomic-ordering to use? I think SC is the most strict.
+  Builder.CreateFence(llvm::AtomicOrdering::SequentiallyConsistent);
+
+  // next load (in the loop)
+  Explosion lowered_next_load;
+  emitLoad(i->getOperand(), objType,
+           i->getOwnershipQualifier(),
+           lowered_next_load);
+  assert(lowered_next_load.size() == 1);
+  llvm::Value *next_load_value = lowered_next_load.claimNext();
+
+  // check whether prev_load_val == next_load_val; jump accordingly.
+  auto cond = Builder.CreateICmpEQ(prev_loaded_local_value, next_load_value);
+  // FIXME: fix the insertion of the `expect` intrinsic.
+  /*Builder.CreateIntrinsicCall(llvm::Intrinsic::ID::expect,
+          {cond, llvm::ConstantInt::getTrue(cond->getType())});*/
+  Builder.CreateCondBr(cond, loadSucceedBB, loadAttemptFailedBB);
+
+  // when a the load loop fails, release the retained obj and try again.
+  Builder.emitBlock(loadAttemptFailedBB);
+  prev_loaded_local_value_explosion = Explosion();
+  prev_loaded_local_value_explosion.add(prev_loaded_local_value);
+  ti.strongRelease(*this, prev_loaded_local_value_explosion,
+                   irgen::Atomicity::Atomic);
+  Builder.CreateStore(next_load_value, prev_loaded_local_variable);
+  Builder.CreateBr(loadLoopBB);
+
+  // the load succeeded.
+  Builder.emitBlock(loadSucceedBB);
+  Explosion out;
+  out.add(prev_loaded_local_value);
+  setLoweredExplosion(i, out);
 }
 
 /// Emit the artificial error result argument.

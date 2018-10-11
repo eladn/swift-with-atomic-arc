@@ -595,6 +595,14 @@ namespace {
       return B.createLoad(loc, addr, LoadOwnershipQualifier::Unqualified);
     }
 
+    SILValue emitAtomicLoadAndStrongRetain(SILBuilder &B, SILLocation loc,
+                                           SILValue addr,
+                                           LoadOwnershipQualifier qual) const override {
+      if (B.getFunction().hasQualifiedOwnership())
+        return B.createAtomicLoadAndStrongRetain(loc, addr, LoadOwnershipQualifier::Trivial);
+      return B.createAtomicLoadAndStrongRetain(loc, addr, LoadOwnershipQualifier::Unqualified);
+    }
+
     SILValue emitAtomicXchg(SILBuilder &B, SILLocation loc, SILValue value,
                             SILValue addr, StoreOwnershipQualifier qual) const override {
       if (B.getFunction().hasQualifiedOwnership())
@@ -710,6 +718,25 @@ namespace {
 
       // Otherwise, emit the copy value operation.
       return B.emitCopyValueOperation(loc, loadValue);
+    }
+
+    SILValue emitAtomicLoadAndStrongRetain(SILBuilder &B,
+            SILLocation loc, SILValue addr,
+            LoadOwnershipQualifier qual) const override {
+      if (B.getFunction().hasQualifiedOwnership())
+        return B.createAtomicLoadAndStrongRetain(loc, addr, qual);
+
+      // The AtomicLoadAndStrongRetain should create the copy.
+      // We now do not have the copy, but the original object.
+      assert(qual != LoadOwnershipQualifier::Copy);
+
+      // FIXME: we do not use the qualifier now. do we assume it is `Unqualified`?
+
+      SILValue loadValue =
+              B.createAtomicLoadAndStrongRetain(loc, addr,
+                      LoadOwnershipQualifier::Unqualified);
+
+      return loadValue;
     }
 
     SILValue emitAtomicXchg(SILBuilder &B, SILLocation loc, SILValue value,
@@ -1021,6 +1048,44 @@ namespace {
       : LeafLoadableTypeLowering(type, RecursiveProperties::forReference(),
                                  IsReferenceCounted) {}
 
+    /// We replace the raw qualified load into an unqualified atomic
+    /// load and strong retain instruction.
+    SILValue emitLoad(SILBuilder &B, SILLocation loc, SILValue addr,
+                      LoadOwnershipQualifier qual) const override {
+      // This impl overrides `NonTrivialLoadableTypeLowering::emitLoad()`
+      // which usually got called, and created an unqualified load & a copy
+      // value operation (the later is used to be performed by this class).
+
+      if (B.getFunction().hasQualifiedOwnership())
+        return B.createLoad(loc, addr, qual);  // FIXME: when do we reach here?
+
+      // If we do not have a copy, just return the value...
+      if (qual != LoadOwnershipQualifier::Copy) {
+        // FIXME: when do we reach here?
+        SILValue loadValue =
+                B.createLoad(loc, addr, LoadOwnershipQualifier::Unqualified);
+        return loadValue;
+      }
+
+      // For now, emit `AtomicLoadAndStrongRetain` only for `ClassType` references.
+      // FIXME: do it for more reference counted types (maybe not all of them..).
+      if (addr->getType().is<ClassType>()
+              && !addr->getType().getObjectType().is<SILFunctionType>()) {
+        // We no longer have to emit copy value operation as before.
+        // Now the copy operation is contained in the `AtomicLoadAndStrongRetainInst`.
+        SILValue loadValue =
+                B.createAtomicLoadAndStrongRetain(loc, addr,
+                                                  LoadOwnershipQualifier::Unqualified,
+                                                  B.getDefaultAtomicity());
+        return loadValue;
+      }
+
+      SILValue loadValue =
+              B.createLoad(loc, addr, LoadOwnershipQualifier::Unqualified);
+      B.emitCopyValueOperation(loc, loadValue);
+      return loadValue;
+    }
+
     SILValue emitCopyValue(SILBuilder &B, SILLocation loc,
                            SILValue value) const override {
       if (isa<FunctionRefInst>(value))
@@ -1106,6 +1171,13 @@ namespace {
     SILValue emitAtomicXchg(SILBuilder &B, SILLocation loc, SILValue value,
                    SILValue addr, StoreOwnershipQualifier qual) const override {
       llvm_unreachable("calling emitAtomicXchg on non-loadable type");
+    }
+
+    SILValue emitAtomicLoadAndStrongRetain(SILBuilder &B, SILLocation loc,
+                                           SILValue addr,
+                                           LoadOwnershipQualifier qual)
+                                           const override {
+      llvm_unreachable("calling emitAtomicLoadAndStrongRetain on non-loadable type");
     }
 
     void emitDestroyAddress(SILBuilder &B, SILLocation loc,

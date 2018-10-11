@@ -224,6 +224,9 @@ protected:
   SWIFT_INLINE_BITFIELD(StrongPinInst, SingleValueInstruction, 1,
       atomicity : 1
   );
+  SWIFT_INLINE_BITFIELD(RefCountingSingleValueInst, SingleValueInstruction, 1,
+      atomicity : 1
+  );
 
   // Ensure that BindMemoryInst bitfield does not overflow.
   IBWTO_BITFIELD_EMPTY(BindMemoryInst, NonValueInstruction);
@@ -292,6 +295,10 @@ protected:
   SWIFT_INLINE_BITFIELD(AtomicXchgInst, SingleValueInstruction,
                         NumStoreOwnershipQualifierBits,
     OwnershipQualifier : NumStoreOwnershipQualifierBits
+  );
+  SWIFT_INLINE_BITFIELD(AtomicLoadAndStrongRetainInst, SingleValueInstruction,
+                        NumLoadOwnershipQualifierBits,
+    OwnershipQualifier : NumLoadOwnershipQualifierBits
   );
 
   SWIFT_INLINE_BITFIELD(UncheckedOwnershipConversionInst,SingleValueInstruction,

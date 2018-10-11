@@ -928,6 +928,7 @@ void AvailableValueDataflowContext::explodeCopyAddr(CopyAddrInst *CAI) {
       }
       continue;
 
+    case SILInstructionKind::AtomicLoadAndStrongRetainInst:  // FIXME: maybe should do something here..
     case SILInstructionKind::LoadInst:
       // If it is a load from the memory object (as oppose to a load from
       // something else), track it as an access.  We need to explicitly check to

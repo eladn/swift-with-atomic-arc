@@ -578,6 +578,23 @@ public:
     return insert(new (getModule())
                       LoadInst(getSILDebugLocation(Loc), LV, Qualifier));
   }
+
+  AtomicLoadAndStrongRetainInst *createAtomicLoadAndStrongRetain(
+          SILLocation Loc, SILValue LV,
+          LoadOwnershipQualifier Qualifier,
+          Atomicity atomicity = Atomicity::Atomic) {
+    assert((Qualifier != LoadOwnershipQualifier::Unqualified) ||
+           !getFunction().hasQualifiedOwnership() &&
+           "Unqualified inst in qualified function");
+    assert((Qualifier == LoadOwnershipQualifier::Unqualified) ||
+           getFunction().hasQualifiedOwnership() &&
+           "Qualified inst in unqualified function");
+    assert(LV->getType().isLoadableOrOpaque(getModule()));
+    assert(isParsing || !getFunction().hasQualifiedOwnership());
+    return insert(new (getModule())
+           AtomicLoadAndStrongRetainInst(
+                   getSILDebugLocation(Loc), LV, Qualifier, atomicity));
+  }
   
   KeyPathInst *createKeyPath(SILLocation Loc,
                              KeyPathPattern *Pattern,

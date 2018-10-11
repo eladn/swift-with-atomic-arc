@@ -1913,6 +1913,18 @@ SILCloner<ImplClass>::visitStrongRetainInst(StrongRetainInst *Inst) {
 
 template<typename ImplClass>
 void
+SILCloner<ImplClass>::visitAtomicLoadAndStrongRetainInst(AtomicLoadAndStrongRetainInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  doPostProcess(Inst,
+                getBuilder().createAtomicLoadAndStrongRetain(
+                        getOpLocation(Inst->getLoc()),
+                        getOpValue(Inst->getOperand()),
+                        Inst->getOwnershipQualifier(),
+                        Inst->getAtomicity()));
+}
+
+template<typename ImplClass>
+void
 SILCloner<ImplClass>::visitClassifyBridgeObjectInst(
                                             ClassifyBridgeObjectInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));

@@ -1634,6 +1634,21 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     break;
   }
 
+  case SILInstructionKind::AtomicLoadAndStrongRetainInst: {
+    assert(RecordKind == SIL_ONE_OPERAND &&
+           "Layout should be OneOperand.");
+    auto Ty = MF->getType(TyID);
+
+    // FIXME: fix the atomicity and qualifier attributes representation in the record.
+    auto Qualifier = LoadOwnershipQualifier(Attr);
+    Atomicity atomicity = (Atomicity)Attr;
+
+    ResultVal = Builder.createAtomicLoadAndStrongRetain(
+            Loc, getLocalValue(ValID, getSILType(Ty, (SILValueCategory)TyCategory)),
+            Qualifier, atomicity);
+    break;
+  }
+
   case SILInstructionKind::LoadUnownedInst: {
     auto Ty = MF->getType(TyID);
     bool isTake = (Attr > 0);

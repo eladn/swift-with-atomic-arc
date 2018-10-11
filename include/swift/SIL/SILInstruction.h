@@ -4753,6 +4753,66 @@ public:
   DEFINE_ABSTRACT_NON_VALUE_INST_BOILERPLATE(RefCountingInst)
 };
 
+/// RefCountingSingleValueInst - An abstract class of instructions
+/// which manipulate the reference count of their object operand.
+/// This can't be a RefCountingInst because it returns a value.
+class RefCountingSingleValueInst
+        : public SingleValueInstruction {
+public:
+  /// The atomicity of a reference counting operation to be used.
+  using Atomicity = RefCountingInst::Atomicity;
+protected:
+  RefCountingSingleValueInst(SILInstructionKind Kind, SILDebugLocation DebugLoc, SILType type,
+                             Atomicity atomicity = Atomicity::Atomic)
+          : SingleValueInstruction(Kind, DebugLoc, type) {
+    setAtomicity(atomicity);
+  }
+
+public:
+  void setAtomicity(Atomicity flag) {
+    SILInstruction::Bits.RefCountingSingleValueInst.atomicity = bool(flag);
+  }
+  void setNonAtomic() {
+    SILInstruction::Bits.RefCountingSingleValueInst.atomicity = bool(Atomicity::NonAtomic);
+  }
+  void setAtomic() {
+    SILInstruction::Bits.RefCountingSingleValueInst.atomicity = bool(Atomicity::Atomic);
+  }
+  Atomicity getAtomicity() const {
+    return Atomicity(SILInstruction::Bits.RefCountingSingleValueInst.atomicity);
+  }
+  bool isNonAtomic() const { return getAtomicity() == Atomicity::NonAtomic; }
+  bool isAtomic() const { return getAtomicity() == Atomicity::Atomic; }
+};
+
+/// AtomicLoadAndStrongRetainInst - Represents a load from
+/// a memory location and atomically strong retain.
+class AtomicLoadAndStrongRetainInst
+    : public UnaryInstructionBase<SILInstructionKind::AtomicLoadAndStrongRetainInst,
+                                  RefCountingSingleValueInst>
+{
+  friend SILBuilder;
+
+  /// Constructs a AtomicLoadAndStrongRetainInst.
+  ///
+  /// \param DebugLoc The location of the expression that caused the load.
+  ///
+  /// \param LValue The SILValue representing the lvalue (address) to
+  ///        use for the atomic load and strong retain.
+  AtomicLoadAndStrongRetainInst(SILDebugLocation DebugLoc, SILValue LValue,
+                                LoadOwnershipQualifier Q = LoadOwnershipQualifier::Unqualified,
+                                Atomicity atomicity = Atomicity::Atomic)
+          : UnaryInstructionBase(DebugLoc, LValue, LValue->getType().getObjectType(), atomicity) {
+    SILInstruction::Bits.AtomicLoadAndStrongRetainInst.OwnershipQualifier = unsigned(Q);
+  }
+
+public:
+  LoadOwnershipQualifier getOwnershipQualifier() const {
+    return LoadOwnershipQualifier(
+            SILInstruction::Bits.AtomicLoadAndStrongRetainInst.OwnershipQualifier);
+  }
+};
+
 /// RetainValueInst - Copies a loadable value.
 class RetainValueInst
     : public UnaryInstructionBase<SILInstructionKind::RetainValueInst,

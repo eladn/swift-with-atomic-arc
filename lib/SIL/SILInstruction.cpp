@@ -429,6 +429,13 @@ namespace {
       return LHSQualifier == RHS->getOwnershipQualifier();
     }
 
+    bool visitAtomicLoadAndStrongRetainInst(const AtomicLoadAndStrongRetainInst *RHS) {
+      auto *X = cast<AtomicLoadAndStrongRetainInst>(LHS);
+      return X->getOwnershipQualifier() == RHS->getOwnershipQualifier()
+          && X->getAtomicity() == RHS->getAtomicity()
+          && X->getOperand() == RHS->getOperand();
+    }
+
     bool visitLoadBorrowInst(const LoadBorrowInst *RHS) { return true; }
 
     bool visitEndBorrowInst(const EndBorrowInst *RHS) { return true; }

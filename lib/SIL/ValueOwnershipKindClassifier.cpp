@@ -350,6 +350,20 @@ ValueOwnershipKind ValueOwnershipKindClassifier::visitLoadInst(LoadInst *LI) {
   llvm_unreachable("Unhandled LoadOwnershipQualifier in switch.");
 }
 
+ValueOwnershipKind ValueOwnershipKindClassifier::visitAtomicLoadAndStrongRetainInst(AtomicLoadAndStrongRetainInst *I) {
+  switch (I->getOwnershipQualifier()) {
+    case LoadOwnershipQualifier::Take:
+    case LoadOwnershipQualifier::Copy:
+      return ValueOwnershipKind::Owned;
+    case LoadOwnershipQualifier::Unqualified:
+      return ValueOwnershipKind::Any;
+    case LoadOwnershipQualifier::Trivial:
+      return ValueOwnershipKind::Trivial;
+  }
+
+  llvm_unreachable("Unhandled LoadOwnershipQualifier in switch.");
+}
+
 ValueOwnershipKind ValueOwnershipKindClassifier::visitAtomicXchgInst(AtomicXchgInst *LI) {
   return ValueOwnershipKind::Owned;
 }

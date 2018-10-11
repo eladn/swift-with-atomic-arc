@@ -1212,6 +1212,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   case SILInstructionKind::DeinitExistentialValueInst:
   case SILInstructionKind::DestroyAddrInst:
   case SILInstructionKind::LoadInst:
+  case SILInstructionKind::AtomicLoadAndStrongRetainInst:  /* FIXME: fix qualifier&atomicity attribute */
   case SILInstructionKind::LoadBorrowInst:
   case SILInstructionKind::BeginBorrowInst:
   case SILInstructionKind::LoadUnownedInst:

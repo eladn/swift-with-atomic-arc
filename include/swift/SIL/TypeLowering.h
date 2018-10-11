@@ -332,6 +332,15 @@ public:
   virtual SILValue emitLoad(SILBuilder &B, SILLocation loc, SILValue addr,
                             LoadOwnershipQualifier qual) const = 0;
 
+  /// Emit a load from \p addr given the LoadOwnershipQualifier \p qual,
+  /// and atomically perform strong_retain to the object at the loaded addr.
+  ///
+  /// This abstracts over the differences in between trivial and non-trivial
+  /// types.
+  virtual SILValue emitAtomicLoadAndStrongRetain(SILBuilder &B,
+          SILLocation loc, SILValue addr,
+          LoadOwnershipQualifier qual) const = 0;
+
   /// Emit an atomic exchange of \p value into \p addr given the
   /// StoreOwnershipQualifier qual.
   ///
