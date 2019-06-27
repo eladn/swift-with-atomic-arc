@@ -31,6 +31,22 @@ template void RefCounts<InlineRefCountBits>::incrementSlow(InlineRefCountBits ol
 template void RefCounts<SideTableRefCountBits>::incrementSlow(SideTableRefCountBits oldbits, uint32_t n);
 
 template <typename RefCountBits>
+bool RefCounts<RefCountBits>::incrementIfAliveSlow(RefCountBits oldbits,
+                                            uint32_t n) {
+  if (oldbits.hasSideTable()) {
+    // Out-of-line slow path.
+    auto side = oldbits.getSideTable();
+    return side->incrementIfAliveStrong(n);
+  }
+  else {
+    // Retain count overflow.
+    swift::swift_abortRetainOverflow();
+  }
+}
+template bool RefCounts<InlineRefCountBits>::incrementIfAliveSlow(InlineRefCountBits oldbits, uint32_t n);
+template bool RefCounts<SideTableRefCountBits>::incrementIfAliveSlow(SideTableRefCountBits oldbits, uint32_t n);
+
+template <typename RefCountBits>
 void RefCounts<RefCountBits>::incrementNonAtomicSlow(RefCountBits oldbits,
                                                      uint32_t n) {
   if (oldbits.hasSideTable()) {

@@ -43,6 +43,10 @@ public:
   virtual void strongRetain(IRGenFunction &IGF, Explosion &in,
                             Atomicity atomicity) const = 0;
 
+  /// Strongly retains a value.
+  virtual llvm::Value *strongRetainIfAlive(IRGenFunction &IGF, Explosion &in,
+                                          Atomicity atomicity) const = 0;
+
   /// Strongly releases a value.
   virtual void strongRelease(IRGenFunction &IGF, Explosion &in,
                              Atomicity atomicity) const = 0;

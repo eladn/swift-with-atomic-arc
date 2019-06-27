@@ -159,6 +159,12 @@ FUNCTION(NativeStrongRetain, swift_retain, C_CC,
          ARGS(RefCountedPtrTy),
          ATTRS(NoUnwind, FirstParamReturned))
 
+// void *swift_retain_if_alive(void *ptr);
+FUNCTION(NativeStrongRetainIfAlive, swift_retain_if_alive, C_CC,
+         RETURNS(RefCountedPtrTy),
+         ARGS(RefCountedPtrTy),
+         ATTRS(NoUnwind, FirstParamReturned))
+
 // void swift_release(void *ptr);
 FUNCTION(NativeStrongRelease, swift_release, C_CC,
          RETURNS(VoidTy),

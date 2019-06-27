@@ -103,12 +103,25 @@ public:
     IGF.emitStrongRetain(value, asDerived().getReferenceCounting(), atomicity);
   }
 
+  llvm::Value *emitScalarRetainIfAlive(IRGenFunction &IGF, llvm::Value *value,
+                                Atomicity atomicity) const {
+    return IGF.emitStrongRetainIfAlive(value, asDerived().getReferenceCounting(), atomicity);
+  }
+
   // Implement the primary retain/release operations of ReferenceTypeInfo
   // using basic reference counting.
   void strongRetain(IRGenFunction &IGF, Explosion &e,
                     Atomicity atomicity) const override {
     llvm::Value *value = e.claimNext();
     asDerived().emitScalarRetain(IGF, value, atomicity);
+  }
+
+  // Implement the primary retain/release operations of ReferenceTypeInfo
+  // using basic reference counting.
+  llvm::Value *strongRetainIfAlive(IRGenFunction &IGF, Explosion &e,
+                                   Atomicity atomicity) const override {
+    llvm::Value *value = e.claimNext();
+    return asDerived().emitScalarRetainIfAlive(IGF, value, atomicity);
   }
 
   void strongRelease(IRGenFunction &IGF, Explosion &e,

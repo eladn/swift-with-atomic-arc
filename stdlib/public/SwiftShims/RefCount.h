@@ -718,6 +718,9 @@ class RefCounts {
   void incrementSlow(RefCountBits oldbits, uint32_t inc) SWIFT_CC(PreserveMost);
 
   LLVM_ATTRIBUTE_NOINLINE
+  bool incrementIfAliveSlow(RefCountBits oldbits, uint32_t inc) SWIFT_CC(PreserveMost);
+
+  LLVM_ATTRIBUTE_NOINLINE
   void incrementNonAtomicSlow(RefCountBits oldbits, uint32_t inc);
 
   LLVM_ATTRIBUTE_NOINLINE
@@ -776,6 +779,21 @@ class RefCounts {
         return incrementSlow(oldbits, inc);
     } while (!refCounts.compare_exchange_weak(oldbits, newbits,
                                               std::memory_order_relaxed));
+  }
+
+  bool incrementIfAlive(uint32_t inc = 1) {
+    auto oldbits = refCounts.load(SWIFT_MEMORY_ORDER_CONSUME);
+    RefCountBits newbits;
+    do {
+      if (!oldbits.hasSideTable() && oldbits.getIsDeiniting())
+        return false;
+      newbits = oldbits;
+      bool fast = newbits.incrementStrongExtraRefCount(inc);
+      if (!fast)
+        return incrementIfAliveSlow(oldbits, inc);
+    } while (!refCounts.compare_exchange_weak(oldbits, newbits,
+                                              std::memory_order_relaxed));
+    return true;
   }
 
   void incrementNonAtomic(uint32_t inc = 1) {
@@ -1323,6 +1341,10 @@ class HeapObjectSideTableEntry {
   
   void incrementStrong(uint32_t inc) {
     refCounts.increment(inc);
+  }
+
+  bool incrementIfAliveStrong(uint32_t inc) {
+    return refCounts.incrementIfAlive(inc);
   }
 
   template <ClearPinnedFlag clearPinnedFlag, PerformDeinit performDeinit>

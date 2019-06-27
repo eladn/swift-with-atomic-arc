@@ -301,6 +301,25 @@ static HeapObject *_swift_retain_(HeapObject *object) {
 
 auto swift::_swift_retain = _swift_retain_;
 
+
+HeapObject *swift::swift_retain_if_alive(HeapObject *object) {
+  return _swift_retain(object);
+}
+
+static HeapObject *_swift_retain_if_alive_(HeapObject *object) {
+  SWIFT_RT_TRACK_INVOCATION(object, swift_retain);
+  if (isValidPointerForNativeRetain(object)) {
+    bool succeeded = object->refCounts.incrementIfAlive(1);
+    if(succeeded) {
+      return object;
+    }
+    return nullptr;
+  }
+  return object;
+}
+
+auto swift::_swift_retain_if_alive = _swift_retain_if_alive_;
+
 HeapObject *swift::swift_nonatomic_retain(HeapObject *object) {
   SWIFT_RT_TRACK_INVOCATION(object, swift_nonatomic_retain);
   if (isValidPointerForNativeRetain(object))

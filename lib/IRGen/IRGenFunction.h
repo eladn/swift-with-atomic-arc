@@ -310,6 +310,9 @@ public:
   //   - strong references
   void emitStrongRetain(llvm::Value *value, ReferenceCounting refcounting,
                         Atomicity atomicity);
+  llvm::Value *emitStrongRetainIfAlive(
+          llvm::Value *value, ReferenceCounting refcounting,
+          Atomicity atomicity);
   void emitStrongRelease(llvm::Value *value, ReferenceCounting refcounting,
                          Atomicity atomicity);
   llvm::Value *emitLoadRefcountedPtr(Address addr, ReferenceCounting style);
@@ -367,6 +370,7 @@ public:
   void emitNativeStrongAssign(llvm::Value *value, Address addr);
   void emitNativeStrongInit(llvm::Value *value, Address addr);
   void emitNativeStrongRetain(llvm::Value *value, Atomicity atomicity);
+  llvm::Value *emitNativeStrongRetainIfAlive(llvm::Value *value, Atomicity atomicity);
   void emitNativeStrongRelease(llvm::Value *value, Atomicity atomicity);
   void emitNativeSetDeallocating(llvm::Value *value);
   //   - unowned references

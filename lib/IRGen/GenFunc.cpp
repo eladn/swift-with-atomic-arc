@@ -348,6 +348,12 @@ namespace {
         IGF.emitNativeStrongRetain(context, atomicity);
     }
 
+    llvm::Value *strongRetainIfAlive(IRGenFunction &IGF, Explosion &e,
+                                     Atomicity atomicity) const override {
+      llvm_unreachable("ClassExistentialTypeInfo::strongRetainIfAlive() should not be called.");
+      return nullptr;
+    }
+
     void strongRelease(IRGenFunction &IGF, Explosion &e,
                        Atomicity atomicity) const override {
       e.claimNext();

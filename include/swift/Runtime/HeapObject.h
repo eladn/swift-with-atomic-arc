@@ -151,6 +151,9 @@ SWIFT_RUNTIME_EXPORT
 HeapObject *swift_retain(HeapObject *object);
 
 SWIFT_RUNTIME_EXPORT
+HeapObject *swift_retain_if_alive(HeapObject *object);
+
+SWIFT_RUNTIME_EXPORT
 HeapObject *swift_retain_n(HeapObject *object, uint32_t n);
 
 SWIFT_RUNTIME_EXPORT

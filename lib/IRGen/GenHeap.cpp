@@ -1011,6 +1011,28 @@ void IRGenFunction::emitNativeStrongRetain(llvm::Value *value,
   call->addParamAttr(0, llvm::Attribute::Returned);
 }
 
+/// Emit a call to swift_retain_if_alive.
+llvm::Value *IRGenFunction::emitNativeStrongRetainIfAlive(
+        llvm::Value *value, Atomicity atomicity) {
+  assert(!doesNotRequireRefCounting(value));
+  /*if (doesNotRequireRefCounting(value))
+    return llvm::ConstantPointerNull(value->getType());
+  */
+
+  // Make sure the input pointer is the right type.
+  if (value->getType() != IGM.RefCountedPtrTy)
+    value = Builder.CreateBitCast(value, IGM.RefCountedPtrTy);
+
+  assert(atomicity == Atomicity::Atomic);
+
+  // Emit the call.
+  llvm::CallInst *call = Builder.CreateCall(
+          IGM.getNativeStrongRetainIfAliveFn(), value);
+  call->setDoesNotThrow();
+  call->addParamAttr(0, llvm::Attribute::Returned);
+  return call;
+}
+
 /// Emit a store of a live value to the given retaining variable.
 void IRGenFunction::emitNativeStrongAssign(llvm::Value *newValue,
                                            Address address) {
@@ -1073,6 +1095,33 @@ void IRGenFunction::emitStrongRetain(llvm::Value *value,
   case ReferenceCounting::Error:
     emitErrorStrongRetain(value);
     return;
+  }
+}
+
+llvm::Value *IRGenFunction::emitStrongRetainIfAlive(
+        llvm::Value *value, ReferenceCounting refcounting, Atomicity atomicity) {
+  /*assert(refcounting == ReferenceCounting::Native);
+  return emitNativeStrongRetainIfAlive(value, atomicity);*/
+  switch (refcounting) {
+    case ReferenceCounting::Native:
+      return emitNativeStrongRetainIfAlive(value, atomicity);
+
+    // FIXME: the following cases do not check liveness.
+    case ReferenceCounting::Bridge:
+      emitBridgeStrongRetain(value, atomicity);
+      return nullptr;
+    case ReferenceCounting::ObjC:
+      emitObjCStrongRetain(value);
+      return nullptr;
+    case ReferenceCounting::Block:
+      emitBlockCopyCall(value);
+      return nullptr;
+    case ReferenceCounting::Unknown:
+      emitUnknownStrongRetain(value, atomicity);
+      return nullptr;
+    case ReferenceCounting::Error:
+      emitErrorStrongRetain(value);
+      return nullptr;
   }
 }
 

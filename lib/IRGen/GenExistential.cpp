@@ -1145,6 +1145,12 @@ public:
     (void)e.claim(getNumStoredProtocols());
   }
 
+  llvm::Value *strongRetainIfAlive(IRGenFunction &IGF, Explosion &e,
+                                   Atomicity atomicity) const override {
+    llvm_unreachable("ClassExistentialTypeInfo::strongRetainIfAlive() should not be called.");
+    return nullptr;
+  }
+
   void strongRelease(IRGenFunction &IGF, Explosion &e,
                      Atomicity atomicity) const override {
     IGF.emitStrongRelease(e.claimNext(), Refcounting, atomicity);

@@ -78,6 +78,7 @@
 #include "NativeConventionSchema.h"
 #include "ReferenceTypeInfo.h"
 #include "WeakTypeInfo.h"
+#include "HeapTypeInfo.h"
 
 using namespace swift;
 using namespace irgen;
@@ -3696,9 +3697,14 @@ void IRGenSILFunction::visitAtomicLoadAndStrongRetainInst(
   // TODO: check that the names are still ok when the cmd inserted more than once.
   //auto *origBB = Builder.GetInsertBlock();
   auto *loadLoopBB = createBasicBlock("LoadLoopBB");
+  auto *firstLoadBB = createBasicBlock("FirstLoadBB");
+  auto *retainSucceedBB = createBasicBlock("RetainSucceedBB");
   auto *loadSucceedBB = createBasicBlock("LoadSucceedBB");
   auto *loadAttemptFailedBB = createBasicBlock("LoadAttemptFailedBB");
   SILType objType = i->getType().getObjectType();
+
+  Builder.CreateBr(firstLoadBB);
+  Builder.emitBlock(firstLoadBB);
 
   // first load
   Explosion lowered_first_load;
@@ -3717,14 +3723,28 @@ void IRGenSILFunction::visitAtomicLoadAndStrongRetainInst(
   // get the previous loaded as a value (from the local variable).
   auto prev_loaded_local_value = Builder.CreateLoad(prev_loaded_local_variable);
 
-  // retain
-  // for now: call the original strong retain.
-  // FIXME: call a modified `try_strong_retain` and check the result value.
+  // strong retain if alive
   Explosion prev_loaded_local_value_explosion;
   prev_loaded_local_value_explosion.add(prev_loaded_local_value);
-  auto &ti = cast<ReferenceTypeInfo>(getTypeInfo(i->getType()));
-  ti.strongRetain(*this, prev_loaded_local_value_explosion,
-                  irgen::Atomicity::Atomic);
+  auto &ti = cast<ReferenceTypeInfo>(getTypeInfo(i->getType()));  // getTypeInfo(i->getType()).as<ReferenceTypeInfo>()
+  llvm::Value *retained_object = ti.strongRetainIfAlive(
+          *this, prev_loaded_local_value_explosion, irgen::Atomicity::Atomic);
+
+  if (retained_object != nullptr) {
+    // check if the strong retain succeeded
+    auto retained_object_pointer_type = llvm::dyn_cast<llvm::PointerType>(
+            retained_object->getType());  // retained_object->getType()->getPointerTo();
+    assert(retained_object_pointer_type != nullptr);
+    auto retain_success_cond = Builder.CreateICmpNE(
+            retained_object, llvm::ConstantPointerNull::get(retained_object_pointer_type));
+    Builder.CreateCondBr(retain_success_cond, retainSucceedBB, firstLoadBB);
+  } else {
+    ti.strongRetain(
+            *this, prev_loaded_local_value_explosion, irgen::Atomicity::Atomic);
+    Builder.CreateBr(retainSucceedBB);
+  }
+
+  Builder.emitBlock(retainSucceedBB);
 
   // memory fence
   // FIXME: maybe the implicit fence of the atomic strong retain is enough?
@@ -3740,11 +3760,11 @@ void IRGenSILFunction::visitAtomicLoadAndStrongRetainInst(
   llvm::Value *next_load_value = lowered_next_load.claimNext();
 
   // check whether prev_load_val == next_load_val; jump accordingly.
-  auto cond = Builder.CreateICmpEQ(prev_loaded_local_value, next_load_value);
+  auto loads_cmp_cond = Builder.CreateICmpEQ(prev_loaded_local_value, next_load_value);
   // FIXME: fix the insertion of the `expect` intrinsic.
   /*Builder.CreateIntrinsicCall(llvm::Intrinsic::ID::expect,
           {cond, llvm::ConstantInt::getTrue(cond->getType())});*/
-  Builder.CreateCondBr(cond, loadSucceedBB, loadAttemptFailedBB);
+  Builder.CreateCondBr(loads_cmp_cond, loadSucceedBB, loadAttemptFailedBB);
 
   // when a the load loop fails, release the retained obj and try again.
   Builder.emitBlock(loadAttemptFailedBB);
