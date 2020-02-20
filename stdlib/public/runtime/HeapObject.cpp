@@ -303,11 +303,11 @@ auto swift::_swift_retain = _swift_retain_;
 
 
 HeapObject *swift::swift_retain_if_alive(HeapObject *object) {
-  return _swift_retain(object);
+  return _swift_retain_if_alive(object);
 }
 
 static HeapObject *_swift_retain_if_alive_(HeapObject *object) {
-  SWIFT_RT_TRACK_INVOCATION(object, swift_retain);
+  SWIFT_RT_TRACK_INVOCATION(object, swift_retain_if_alive);
   if (isValidPointerForNativeRetain(object)) {
     bool succeeded = object->refCounts.incrementIfAlive(1);
     if(succeeded) {
